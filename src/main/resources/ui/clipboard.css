@@ -1,0 +1,270 @@
+/* macOS-style popup theme for the clipboard history window. */
+
+.root {
+    -fx-font-family: "SF Pro Text", ".AppleSystemUIFont", "Helvetica Neue", sans-serif;
+    -fx-font-size: 13px;
+    /* JavaFX's built-in modena stylesheet paints the scene root opaque white,
+       which shows as a white square around the rounded panel on a TRANSPARENT stage. */
+    -fx-background-color: transparent;
+    -panel-bg: rgba(246, 246, 246, 0.98);
+    -panel-fg: #1d1d1f;
+    -muted: #86868b;
+    -accent: #0a84ff;
+    -row-hover: rgba(0, 0, 0, 0.05);
+    -row-selected: rgba(10, 132, 255, 0.16);
+    -divider: rgba(0, 0, 0, 0.08);
+}
+
+.popup-root {
+    -fx-background-color: -panel-bg;
+    -fx-background-radius: 14;
+    -fx-border-color: rgba(0, 0, 0, 0.14);
+    -fx-border-radius: 14;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.34), 34, 0.28, 0, 12);
+}
+
+/* Top bar: drag handle + traffic-light close/minimize (stage has no native chrome). */
+.popup-topbar {
+    -fx-padding: 9 12 5 12;
+    -fx-alignment: center-left;
+    -fx-background-radius: 14 14 0 0;
+    -fx-cursor: move;
+}
+
+.topbar-title {
+    -fx-text-fill: -muted;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.traffic-light {
+    -fx-background-radius: 9;
+    -fx-min-width: 17;
+    -fx-min-height: 17;
+    -fx-pref-width: 17;
+    -fx-pref-height: 17;
+    -fx-alignment: center;
+    -fx-font-size: 12px;
+    -fx-text-fill: rgba(0, 0, 0, 0.55);
+    -fx-cursor: hand;
+}
+
+.close-light {
+    -fx-background-color: #ff5f57;
+}
+
+.minimize-light {
+    -fx-background-color: #febc2e;
+}
+
+.traffic-light:hover {
+    -fx-opacity: 0.8;
+}
+
+/* Header / tabs */
+.popup-header {
+    -fx-padding: 12 16 8 16;
+    -fx-spacing: 18;
+    -fx-alignment: center-left;
+    -fx-border-color: transparent transparent -divider transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.tab-button {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -muted;
+    -fx-background-color: transparent;
+    -fx-padding: 2 4 4 4;
+    -fx-cursor: hand;
+    -fx-border-color: transparent transparent transparent transparent;
+    -fx-border-width: 0 0 2 0;
+}
+
+.tab-button:selected {
+    -fx-text-fill: -panel-fg;
+    -fx-border-color: transparent transparent -accent transparent;
+}
+
+.search-field {
+    -fx-background-color: rgba(0, 0, 0, 0.05);
+    -fx-background-radius: 8;
+    -fx-text-fill: -panel-fg;
+    -fx-prompt-text-fill: -muted;
+    -fx-padding: 8 10 8 10;
+    -fx-font-size: 13px;
+}
+
+.search-field:focused {
+    -fx-background-color: rgba(0, 0, 0, 0.03);
+    -fx-border-color: -accent;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.search-box {
+    -fx-padding: 8 14 8 14;
+}
+
+/* Clipboard list */
+.clipboard-list {
+    -fx-background-color: transparent;
+    -fx-padding: 4 8 8 8;
+}
+
+.clipboard-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.clipboard-list .list-cell:filled:selected {
+    -fx-background-color: transparent;
+}
+
+.clipboard-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 9;
+    -fx-padding: 9 10 9 10;
+    -fx-spacing: 2;
+    -fx-cursor: hand;
+}
+
+.clipboard-item:selected {
+    -fx-background-color: -row-selected;
+}
+
+.clipboard-item:empty {
+    -fx-opacity: 0;
+}
+
+.item-preview {
+    -fx-text-fill: -panel-fg;
+    -fx-font-size: 13.5px;
+}
+
+.item-preview:selected {
+    -fx-text-fill: -panel-fg;
+}
+
+.item-meta {
+    -fx-text-fill: -muted;
+    -fx-font-size: 11.5px;
+}
+
+.item-actions {
+    -fx-spacing: 2;
+    -fx-alignment: center;
+}
+
+.icon-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -muted;
+    -fx-font-size: 14px;
+    -fx-background-radius: 6;
+    -fx-padding: 3 6 3 6;
+    -fx-cursor: hand;
+}
+
+.icon-button:hover {
+    -fx-background-color: -row-hover;
+    -fx-text-fill: -panel-fg;
+}
+
+/* Pin state must be obvious at a glance; -fx-text-fill does not apply to color
+   emoji glyphs on macOS, so opacity is used instead. */
+.pin-button {
+    -fx-opacity: 0.35;
+}
+
+.pin-button:on,
+.pinned .pin-button {
+    -fx-opacity: 1.0;
+}
+
+.pin-button:hover {
+    -fx-opacity: 1.0;
+}
+
+.thumb {
+    -fx-background-radius: 5;
+    -fx-border-color: rgba(0, 0, 0, 0.12);
+    -fx-border-radius: 5;
+}
+
+/* Emoji tab */
+.emoji-scroll {
+    -fx-background-color: transparent;
+    -fx-fit-to-width: true;
+}
+
+.emoji-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.emoji-content {
+    -fx-padding: 4 10 8 10;
+    -fx-spacing: 6;
+}
+
+.emoji-category-label {
+    -fx-text-fill: -muted;
+    -fx-font-size: 11.5px;
+    -fx-font-weight: bold;
+    -fx-padding: 6 4 0 4;
+}
+
+.emoji-flow {
+    -fx-hgap: 2;
+    -fx-vgap: 2;
+}
+
+.emoji-cell {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-font-size: 24px;
+    -fx-min-width: 40;
+    -fx-min-height: 40;
+    -fx-alignment: center;
+    -fx-cursor: hand;
+}
+
+.emoji-cell:hover,
+.emoji-cell:focused {
+    -fx-background-color: -row-hover;
+}
+
+/* General text */
+.hint {
+    -fx-text-fill: -muted;
+    -fx-font-size: 11px;
+}
+
+/* Settings window */
+.settings-root {
+    -fx-background-color: -panel-bg;
+    -fx-padding: 18;
+    -fx-spacing: 12;
+}
+
+.settings-title {
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -panel-fg;
+}
+
+.settings-row {
+    -fx-spacing: 10;
+    -fx-alignment: center-left;
+}
+
+.settings-label {
+    -fx-text-fill: -panel-fg;
+    -fx-min-width: 190;
+}
+
+.section-header {
+    -fx-text-fill: -panel-fg;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-padding: 8 0 0 0;
+}

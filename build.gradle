@@ -1,0 +1,130 @@
+plugins {
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+group = 'com.clipboard'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+javafx {
+    version = '21.0.4'
+    modules = ['javafx.controls', 'javafx.graphics']
+}
+
+dependencies {
+    // Embedded local database
+    implementation 'org.xerial:sqlite-jdbc:3.49.1.0'
+
+    // Global hotkeys (macOS/Windows/Linux)
+    implementation 'com.github.kwhat:jnativehook:2.2.2'
+
+    // Native macOS access (Accessibility + AppKit) for activation & synthetic paste
+    implementation 'net.java.dev.jna:jna:5.14.0'
+    implementation 'net.java.dev.jna:jna-platform:5.14.0'
+
+    // Logging
+    implementation 'org.slf4j:slf4j-simple:2.0.13'
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'app.ClipboardApplication'
+}
+
+// Headless-friendly AWT/JavaFX: run detached from the Dock via app bundle (see README).
+run {
+    jvmArgs '-Dapple.awt.UIElement=true',
+            '-Dprism.lcdtext=false'
+    if (project.hasProperty('devpopup')) {
+        jvmArgs '-Dclipboard.dev.popup=true'
+    }
+    if (project.hasProperty('devemoji')) {
+        jvmArgs '-Dclipboard.dev.popup=true', '-Dclipboard.dev.emoji=true'
+    }
+    if (project.hasProperty('devsettings')) {
+        jvmArgs '-Dclipboard.dev.popup=true', '-Dclipboard.dev.settings=true'
+    }
+    // Keep stdin attached so the Gradle console can still stop it.
+    standardInput = System.in
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
+    // Unit tests never touch the real macOS clipboard.
+    systemProperty 'java.awt.headless', 'true'
+}
+
+// Package a runnable macOS .app (menu-bar / accessory app) using jpackage.
+// Usage: ./gradlew packageApp   (run on macOS; requires the JDK's jpackage on PATH)
+tasks.register('packageApp', Exec) {
+    group = 'distribution'
+    description = 'Package a macOS .app bundle with jpackage.'
+    dependsOn 'installDist'
+
+    doFirst {
+        def stageDir = file("$buildDir/stage")
+        stageDir.deleteDir()
+        stageDir.mkdirs()
+    }
+
+    def installLib = file("build/install/clipboard/lib")
+    def mainJar = "clipboard-${project.version}.jar"
+    def iconFile = file('packaging/icon.icns')
+
+    doFirst {
+        // Resolve jpackage from the running JDK (bundled since JDK 14).
+        def jpkg = new File(System.getProperty('java.home'), 'bin/jpackage')
+        def jpkgPath = jpkg.exists() ? jpkg.absolutePath : 'jpackage'
+        def cmdline = [
+                jpkgPath,
+                '--type', 'app-image',
+                '--name', 'Clipboard',
+                '--app-version', project.version.toString(),
+                '--vendor', 'Clipboard',
+                '--input', installLib.absolutePath,
+                '--main-jar', mainJar,
+                '--main-class', 'app.Launcher',
+                '--dest', file("$buildDir/stage").absolutePath,
+                '--mac-package-name', 'Clipboard',
+                '--mac-package-identifier', 'local.clipboardhistory',
+                '--java-options', '-Dapple.awt.UIElement=true',
+                '--java-options', '-Dprism.lcdtext=false'
+        ]
+        if (iconFile.exists()) {
+            cmdline += ['--icon', iconFile.absolutePath]
+        }
+        commandLine cmdline
+    }
+
+    doLast {
+        def appDir = file("build/stage/Clipboard.app")
+        def plist = new File(appDir, 'Contents/Info.plist')
+        if (plist.exists()) {
+            def text = plist.text
+            if (!text.contains('LSUIElement')) {
+                text = text.replace('<key>NSPrincipalClass</key>',
+                        '<key>LSUIElement</key>\n\t<true/>\n\t<key>NSPrincipalClass</key>')
+                plist.text = text
+            }
+            logger.lifecycle("Configured LSUIElement (menu-bar only) in $plist")
+        } else {
+            logger.warn("jpackage did not produce an Info.plist; run packageApp on macOS.")
+        }
+    }
+}
