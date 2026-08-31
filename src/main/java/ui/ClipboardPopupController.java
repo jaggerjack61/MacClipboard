@@ -105,10 +105,7 @@ public final class ClipboardPopupController {
         VBox root = new VBox(topBar, header, contentArea);
         root.getStyleClass().add("popup-root");
 
-        StackPane outer = new StackPane(root);
-        outer.setPadding(new javafx.geometry.Insets(8));
-
-        Scene scene = new Scene(outer, WIDTH + 16, HEIGHT + 16);
+        Scene scene = new Scene(root, WIDTH, HEIGHT);
         scene.setFill(null);
         scene.getStylesheets().add(ClipboardPopupController.class.getResource("/ui/clipboard.css").toExternalForm());
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.ESCAPE), this::hidePopup);

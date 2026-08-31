@@ -18,9 +18,6 @@
 .popup-root {
     -fx-background-color: -panel-bg;
     -fx-background-radius: 14;
-    -fx-border-color: rgba(0, 0, 0, 0.14);
-    -fx-border-radius: 14;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.34), 34, 0.28, 0, 12);
 }
 
 /* Top bar: drag handle + traffic-light close/minimize (stage has no native chrome). */
@@ -191,31 +188,32 @@
     -fx-border-radius: 5;
 }
 
-/* Emoji tab */
-.emoji-scroll {
+/* Emoji tab (virtualized ListView of section headers + emoji rows) */
+.emoji-list {
     -fx-background-color: transparent;
-    -fx-fit-to-width: true;
+    -fx-padding: 4 0 0 0;
 }
 
-.emoji-scroll > .viewport {
+.emoji-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.emoji-list .list-cell:filled:selected {
     -fx-background-color: transparent;
 }
 
-.emoji-content {
-    -fx-padding: 4 10 8 10;
-    -fx-spacing: 6;
-}
-
-.emoji-category-label {
+.emoji-header-cell {
     -fx-text-fill: -muted;
     -fx-font-size: 11.5px;
     -fx-font-weight: bold;
-    -fx-padding: 6 4 0 4;
+    -fx-padding: 6 14 2 14;
 }
 
-.emoji-flow {
-    -fx-hgap: 2;
-    -fx-vgap: 2;
+.emoji-row {
+    -fx-spacing: 2;
+    -fx-alignment: center;
+    -fx-padding: 1 0 1 0;
 }
 
 .emoji-cell {
@@ -229,7 +227,7 @@
 }
 
 .emoji-cell:hover,
-.emoji-cell:focused {
+.emoji-cell:active {
     -fx-background-color: -row-hover;
 }
 
