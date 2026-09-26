@@ -1,122 +1,181 @@
-# Clipboard — macOS Clipboard History + Emoji Picker (Java/JavaFX)
+<p align="center">
+  <img src="docs/icon.png" width="128" height="128" alt="Clipboard History app icon">
+</p>
 
-A lightweight, menu-bar-only macOS application that keeps a history of everything you copy
-and adds an integrated **Emoji picker** in the same popup — built entirely in
-**Java 21 + JavaFX**.
+<h1 align="center">Clipboard History</h1>
 
-```
-┌──────────────────────────────────────┐
-│ Clipboard     Emoji      ⌘1 2 · ⎋   │   ← tabs
-├──────────────────────────────────────┤
-│ Search clipboard...                  │   ← search field
-├──────────────────────────────────────┤
-│ Hello world                 📌  ✕    │   ← entry + pin/delete
-│ Text · 10 seconds ago                │
-├──────────────────────────────────────┤
-│ SELECT * FROM users WHERE …   📌  ✕  │
-│ Text · 2 minutes ago                 │
-├──────────────────────────────────────┤
-│ [🖼]                                 │
-│ Image · 5 minutes ago         📌  ✕  │
-└──────────────────────────────────────┘
-```
+<p align="center">
+  <b>A fast, private clipboard manager and emoji picker for macOS.</b><br>
+  Everything you copy, one keystroke away.
+</p>
 
-Press **⌘⇧V** anywhere to open the popup near the mouse. The **Emoji** tab in the
-same popup gives you a searchable, categorized emoji grid with recently-used tracking.
-Selecting anything copies it and (by default) pastes it into the app you were using.
+<p align="center">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-Apple%20silicon-000000?logo=apple&logoColor=white">
+  <img alt="Java 21" src="https://img.shields.io/badge/Java-21-E76F00?logo=openjdk&logoColor=white">
+  <img alt="JavaFX 21" src="https://img.shields.io/badge/JavaFX-21-2D7FF9">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-34C759"></a>
+</p>
 
----
+<p align="center">
+  <img src="docs/screenshots/hero.png" width="860" alt="The Clipboard History popup in light and dark mode, showing recent copies, pinned items and collections">
+</p>
 
-## Features
+Press **⌘⇧V** in any app and your clipboard history appears right under the pointer.
+Pick an item and it is pasted straight back into what you were doing. Pin the things you
+reuse, sort them into collections, and find anything with a quick search. An emoji
+picker lives in the same window. Everything stays on your Mac.
 
-| Area | Details |
+## Highlights
+
+- **Instant recall.** Text, rich text, links and images, newest first, with previews and thumbnails.
+- **Paste where you were.** Choosing an item puts it back in the app you came from and pastes it for you.
+- **Pins and collections.** Keep snippets forever and file them under collections you name yourself.
+- **Search as you type.** Filter the whole history, your pinned items, or a single collection.
+- **Built-in emoji picker.** 1,900+ emoji with keyword search and recently used favorites.
+- **Feels native.** Follows Light and Dark Mode, lives in the menu bar, and is fully keyboard driven.
+- **Private by design.** No accounts, no network access, no telemetry. History is a local SQLite file you control.
+
+## Collections
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/collections-dark.png">
+    <img src="docs/screenshots/collections-light.png" width="620" alt="A collection named Snippets, with the item menu open on Add to Collection">
+  </picture>
+</p>
+
+Collections keep the things you reuse organized: code snippets, addresses, brand colors,
+canned replies. Give them any name you like.
+
+- Click **+** in the chip row, type a name and press Return.
+- Right-click an item, or hover it and click the folder button, then choose a collection.
+- Double-click a collection chip to rename it; right-click it to rename or delete.
+
+Filing an item pins it, so it is never removed by the history limit, the retention
+period or **Clear History**. Deleting a collection keeps its items as pinned items.
+
+## Emoji picker
+
+<p align="center">
+  <img src="docs/screenshots/emoji-dark.png" width="520" alt="The emoji tab in dark mode with recently used emoji and the category bar">
+</p>
+
+Switch with **⌘2**. Search by name or keyword (`laugh` → 🤣 😄, `fire` → 🔥, `rocket` → 🚀), jump
+between categories from the bar, and move around the grid with the arrow keys. The emoji
+you use most float to the top.
+
+## Settings
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-dark.png">
+    <img src="docs/screenshots/settings-light.png" width="600" alt="The Settings window with General and History sections">
+  </picture>
+</p>
+
+Choose the global shortcut, how much history to keep and for how long, whether to paste
+automatically, launch at login, and whether history survives a restart.
+
+## Keyboard shortcuts
+
+| Keys | Action |
 |---|---|
-| Clipboard monitoring | Polls the macOS clipboard every 400 ms (off the UI thread); plain text, rich text (HTML) and images |
-| Duplicate handling | SHA-256 content hash; ignores no-change repeats; re-copying an older item moves it to the top instead of duplicating |
-| History | Configurable size (default 100); oldest **non-pinned** items are evicted first; optional retention period |
-| Pin / delete / clear | Per-item pin and delete; clear history (keeps pinned); clear-all |
-| Search | Case-insensitive substring search over text entries |
-| Popup | Floating, always-on-top, near the mouse, closes on focus loss / Escape; keyboard navigable |
-| Tabs | `Clipboard` and `Emoji` in one popup; ⌘1 / ⌘2 to switch, ←/→ when the tab bar has focus |
-| Emoji picker | 1900+ offline Unicode emoji, 9 categories, recently-used ranking (frequency + recency), emoji search by name *and* keyword |
-| Automatic paste | Restores focus to the previous app and synthesizes ⌘V (requires Accessibility permission); graceful copy-only fallback |
-| Global hotkey | System-wide ⌘⇧V via a CoreGraphics event tap (JNativeHook), isolated behind `GlobalHotkeyService` |
-| Menu bar | Runs as an accessory (no Dock icon) with a tray menu: open history, open emoji, pause, clear, settings, quit |
-| Persistence | Local SQLite (`~/Library/Application Support/Clipboard/clipboard.db`); can be disabled (in-memory mode) |
-| Privacy | Pause monitoring, clear history, disable persistence, retention limits, app-ignore extension point; clipboard contents are never logged |
-| Settings | History size, retention, launch at login, global shortcut, auto-paste, persistence, recent-emoji options |
+| **⌘⇧V** | Open or close the popup (configurable in Settings) |
+| **⌘1** / **⌘2** | Clipboard / Emoji tab |
+| **↑** **↓** | Move through the list |
+| **↩** or double-click | Paste the selected item |
+| **⌘P** | Pin or unpin |
+| **⌫** | Delete the selected item |
+| **esc** | Clear the search, then close |
+| Right-click | Paste, pin, add to a collection or delete |
 
----
+## Install
 
-## Requirements
-
-* **macOS** (tested on macOS 26, arm64)
-* **JDK 21** (bundled into the app image when packaged; `java -version` must report 21+)
-* Gradle — use the checked-in wrapper (`./gradlew`); it downloads Gradle 8.14 automatically.
-
-Runtime dependencies (resolved by Gradle from Maven Central — the app itself needs no
-network access at runtime):
-
-| Dependency | Purpose |
-|---|---|
-| OpenJFX 21 (`javafx.controls`, `javafx.graphics`) | UI toolkit |
-| `org.xerial:sqlite-jdbc` | embedded local database |
-| `com.github.kwhat:jnativehook` | global keyboard shortcut (native event tap) |
-| `net.java.dev.jna` | AppKit/CoreGraphics calls (focus restore, synthetic paste, activation policy) |
-| `org.slf4j:slf4j-simple` | logging |
-
----
-
-## Running
+Clipboard History is built from source; you need macOS and JDK 21.
 
 ```bash
-./gradlew run            # start the app (menu-bar only; no Dock icon)
-./gradlew test           # run the unit tests
-./gradlew build          # compile + test + jar
+git clone https://github.com/jaggerjack61/MacClipboard.git
+cd MacClipboard
+./gradlew packageApp                      # builds build/stage/Clipboard.app
+cp -R build/stage/Clipboard.app /Applications/
+open /Applications/Clipboard.app
 ```
 
-The popup opens with **⌘⇧V**. The menu-bar icon (clipboard glyph) offers:
-Open Clipboard History · Open Emoji Picker · Pause Clipboard Monitoring · Clear History ·
-Settings · Quit.
+The app lives in the menu bar (no Dock icon). Click the clipboard icon, or press
+**⌘⇧V**, to open it.
+
+### Permissions
+
+Capturing history works without any permissions. Two features need **Accessibility**
+access (*System Settings → Privacy & Security → Accessibility*):
+
+1. **The global shortcut.** It listens for ⌘⇧V system-wide through a macOS event tap.
+2. **Automatic paste.** Pasting into another app means sending it a ⌘V keystroke.
+
+Settings shows whether access is granted and has a button that opens the right pane.
+Without it, choosing an item still copies it, so you can press ⌘V yourself.
+
+> **Tip:** the app is not signed with a developer certificate, so after installing a new
+> build macOS may treat it as a different app. If the shortcut stops responding, remove
+> Clipboard from the Accessibility list, add it again and relaunch.
+
+To make a distributable DMG:
+
+```bash
+jpackage --type dmg --name Clipboard --app-version 1.0.0 \
+         --input build/install/clipboard/lib --main-jar clipboard-1.0.0.jar \
+         --main-class app.Launcher --dest build/dist \
+         --icon packaging/icon.icns \
+         --java-options "-Dapple.awt.UIElement=true"
+```
+
+## Privacy
+
+- Nothing is ever sent over the network; the app makes no network requests at all.
+- History lives in `~/Library/Application Support/Clipboard/clipboard.db`. Turn off
+  *Keep history after restart* to keep it in memory only.
+- Pause capture from the menu bar at any time, clear history in one click, and set a
+  retention period so old items expire.
+- Clipboard contents are never written to logs.
+
+---
+
+## Development
+
+Requirements: macOS, **JDK 21**, and the checked-in Gradle wrapper (`./gradlew`
+downloads Gradle 8.14 automatically).
+
+```bash
+./gradlew run              # start the app (menu bar only)
+./gradlew test             # unit tests
+./gradlew uiTest           # JavaFX and native checks (needs a desktop session)
+./gradlew packageApp       # build/stage/Clipboard.app
+```
 
 Development helpers:
 
 ```bash
-./gradlew -Pdevpopup run   # seeds sample entries and opens the popup automatically
-./gradlew -Pdevemoji run   # same, opening the Emoji tab
+./gradlew -Pdevpopup run     # seeds sample entries and opens the popup
+./gradlew -Pdevemoji run     # same, on the Emoji tab
 ./gradlew -Pdevsettings run  # opens the Settings window
+java scripts/GenerateAppIcon.java   # redraws packaging/icon.icns and the in-app icon
 ```
 
-### macOS permissions
+When running with `./gradlew run`, grant Accessibility to your terminal instead of the app.
+“Launch at login” writes `~/Library/LaunchAgents/local.clipboardhistory.agent.plist`, which
+opens the packaged app at login; it works best with the app installed in `/Applications`.
 
-The app works without any permissions for basic clipboard *capture* (copying items into
-history). Two features require **Accessibility** permission
-(*System Settings → Privacy & Security → Accessibility*):
+Runtime dependencies (resolved from Maven Central at build time):
 
-1. **Global hotkey** — JNativeHook creates a `CGEventTap` to observe key presses system-wide.
-   Without permission, registration fails and the menu can still open the popup; the tray
-   menu's “Open Clipboard History” works regardless.
-2. **Automatic paste** — synthesizing ⌘V into another app requires posting events via
-   CoreGraphics, which only succeeds for trusted processes.
+| Dependency | Purpose |
+|---|---|
+| OpenJFX 21 (`javafx.controls`, `javafx.graphics`) | UI toolkit |
+| `org.xerial:sqlite-jdbc` | Embedded local database |
+| `com.github.kwhat:jnativehook` | Global keyboard shortcut (native event tap) |
+| `net.java.dev.jna` | AppKit/CoreGraphics calls (focus restore, synthetic paste, appearance) |
+| `org.slf4j:slf4j-simple` | Logging |
 
-Grant it once: when prompted, add your terminal (for `./gradlew run`) — or `Clipboard.app`
-after packaging — in the Accessibility list. The Settings window shows the current
-permission state and a button that opens the right System Settings pane.
-If paste is not permitted, selection still copies to the clipboard: just press ⌘V manually.
-
-When packaged as an `.app` (below), macOS asks for permission the first time the hotkey
-or paste is attempted, and the prompt names the app.
-
-### Launch at login
-
-Toggling “Launch at login” writes a LaunchAgent plist
-(`~/Library/LaunchAgents/local.clipboardhistory.agent.plist`) that runs the packaged
-`.app` at login via `open`. It works best after packaging; in `./gradlew run` mode there
-is no stable bundle path, so the entry points at the project directory.
-
----
-
-## How the pieces work
+## How it works
 
 ### Global shortcut (`⌘⇧V`)
 
@@ -129,12 +188,19 @@ is no stable bundle path, so the entry points at the project directory.
 ### The popup
 
 * `ui.ClipboardPopupController` creates an undecorated, always-on-top JavaFX `Stage`
-  (`StageStyle.TRANSPARENT`) with rounded, vibrant-style CSS (`resources/ui/clipboard.css`).
+  (`StageStyle.TRANSPARENT`) with rounded CSS (`resources/ui/clipboard.css`). `ui.Theme` adds
+  `clipboard-dark.css` (token overrides only) when macOS is in Dark Mode, re-checked on every
+  show, and `MacNative.refreshWindowShadow` gives the borderless window a native shadow.
 * It positions itself centered under the mouse (`positionNearMouse`), clamped to screen bounds.
 * It closes when it loses focus or on **Escape**. Selecting an entry also closes it.
-* Keyboard: ↑/↓ navigate, **Enter** or double-click selects, **Delete** removes the focused
+* Keyboard: ↑/↓ navigate, **Enter** or double-click selects, **Delete** / **⌫** removes the focused
   item, **⌘P** pins it. Typing while the Emoji tab is open focuses the search field.
 * Tab switching: click the tabs, **⌘1** / **⌘2**, or ←/→ when a tab button has focus.
+* Collections: `ui.CollectionBar` is the chip row (All, Pinned, one chip per collection, **+**).
+  Collections are created and renamed with an inline field rather than a dialog, which would
+  take focus and close the popup. An item belongs to at most one collection
+  (`clipboard_items.collection_id`); filing pins it, unpinning clears it, and deleting a
+  collection leaves its items pinned.
 
 ### Clipboard monitoring & history
 
@@ -143,10 +209,13 @@ is no stable bundle path, so the entry points at the project directory.
   Image payloads are re-encoded as PNG and a 72 px thumbnail is stored for previews, so
   large screenshots don't bloat memory or the list.
 * `clipboard.ClipboardMonitor` polls every 400 ms on a daemon scheduler (the macOS
-  clipboard offers no push API for passive observers).
+  clipboard offers no push API for passive observers). It checks the native pasteboard
+  change count before reading payloads, so unchanged images are not repeatedly encoded.
 * `clipboard.ClipboardService` performs SHA-256 dedupe (identical-to-latest is ignored;
   re-copying an older item moves it to the top), enforces the history limit by evicting the
   oldest non-pinned entries, applies the retention window, and exposes search.
+  Retention also runs every minute while idle or paused, and immediately when changed
+  in Settings. Clearing history does not recapture the unchanged clipboard.
 * Temporary clipboard ownership errors from other apps are caught and retried on the next poll.
 
 ### Automatic paste (⌘V)
@@ -167,7 +236,7 @@ is no stable bundle path, so the entry points at the project directory.
   Unicode emoji (Unicode 16 dataset) with CLDR names, category, and keyword aliases
   merged from gemoji. It is bundled, so **no network access is ever required**.
 * Search matches names *and* keywords, ranked exact → prefix → contains:
-  `laugh → 😂 🤣`, `heart → ❤️ 💕`, `fire → 🔥`, `check → ✅`, `rocket → 🚀`.
+  `laugh → 🤣 😄`, `heart → 💘 💝`, `fire → 🔥`, `check → ✅`, `rocket → 🚀`.
 * Clicking/Enter copies the emoji, records it in `recent_emojis` (SQLite), closes the
   popup and pastes it.
 * `RecentEmojiService` ranks recents with a combined frequency + exponential-decay
@@ -178,8 +247,11 @@ is no stable bundle path, so the entry points at the project directory.
 ### Persistence
 
 * `repository.Database` owns the SQLite connection and applies migrations via
-  `PRAGMA user_version` (tables: `clipboard_items`, `settings`, `recent_emojis`).
-* WAL mode; all database access is off the FX thread; the popup reloads on open.
+  `PRAGMA user_version` (tables: `clipboard_items`, `collections`, `settings`,
+  `recent_emojis`). Upgrades are additive, so existing history is kept.
+* WAL mode; clipboard list queries run off the FX thread and fetch only previews and
+  thumbnails. Full payloads are loaded on selection; searches are debounced and stale
+  results are discarded. The popup reloads on open.
 * Turning off “Store clipboard history between restarts” switches to
   `InMemoryClipboardRepository` on the next launch.
 * **Nothing is ever sent over the network.** Clipboard data lives only in
@@ -194,39 +266,12 @@ is no stable bundle path, so the entry points at the project directory.
 
 ---
 
-## Settings
+### Menu bar
 
-Window (tray → **Settings…**): history size, retention period, global shortcut,
-launch at login, automatic paste, store history between restarts, remember recently used
-emojis + limit, “Clear clipboard history now”, Accessibility permission status, and an
-**About** section (open-source credit and source repository link).
-
----
-
-## Packaging as a `.app`
-
-Requires a JDK with `jpackage` (11+; tested with 21) and the `packaging/icon.icns`
-(generated: see `packaging/`).
-
-```bash
-./gradlew packageApp
-# -> build/stage/Clipboard.app  (LSUIElement is injected automatically → no Dock icon)
-```
-
-To make it distributable, optionally build a DMG:
-
-```bash
-jpackage --type dmg --name Clipboard --app-version 1.0.0 \
-         --input build/install/clipboard/lib --main-jar clipboard-1.0.0.jar \
-         --main-class app.Launcher --dest build/dist \
-         --icon packaging/icon.icns \
-         --java-options "-Dapple.awt.UIElement=true"
-```
-
-Install the app to `/Applications`, launch it once, and grant **Accessibility** when
-prompted (Settings → Privacy & Security → Accessibility).
-
----
+`tray.MenuBarService` draws the menu-bar glyph at 1x and 2x as a macOS *template image*
+(`apple.awt.enableTemplateImages`), so the system tints it for light and dark menu bars
+like native icons. Left-click opens the popup; the menu offers the emoji picker, pause,
+clear, Settings and Quit.
 
 ## Architecture
 
@@ -235,7 +280,8 @@ src/main/java/
   app/         ClipboardApplication (JavaFX wiring), Launcher (classpath-safe entry)
   clipboard/   ClipboardMonitor, ClipboardService, ClipboardHasher, ClipboardGateway,
                AwtClipboardGateway (macOS system clipboard), ClipboardSnapshot
-  model/       ClipboardItem, ClipboardContentType
+  model/       ClipboardItem, ClipboardPreview, ClipboardCollection, HistoryFilter,
+               ClipboardContentType
   repository/  ClipboardRepository + Sqlite/InMemory impls, SettingsStore + Sqlite impl,
                Database (migrations)
   emoji/       Emoji, EmojiCategory, EmojiRepository, EmojiService,
@@ -243,24 +289,34 @@ src/main/java/
   hotkey/      GlobalHotkeyService, MacGlobalHotkeyService (JNativeHook), ShortcutModifier
   paste/       PasteService, MacPasteService
   platform/    MacNative (JNA/AppKit/CoreGraphics/Accessibility), ObjCRuntime, LaunchAtLogin
-  ui/          ClipboardPopupController, ClipboardTabController, EmojiTabController,
-               SettingsController, RelativeTime
+  ui/          ClipboardPopupController, ClipboardTabController, CollectionBar,
+               EmojiTabController, SettingsController, Theme, Icons, Controls, RelativeTime
   tray/        MenuBarService (SystemTray)
   security/    PrivacyService
 src/main/resources/
-  emoji/emojis.tsv   offline dataset (generated from Unicode 16 + gemoji)
-  ui/clipboard.css   macOS-style popup theme
-scripts/       build_emoji_dataset.py + source data
+  emoji/emojis.tsv       offline dataset (generated from Unicode 16 + gemoji)
+  ui/clipboard.css       theme: light tokens and all rules
+  ui/clipboard-dark.css  dark-mode token overrides
+  ui/app-icon.png        app icon shown in Settings
+scripts/       build_emoji_dataset.py + source data, GenerateAppIcon.java
 packaging/     icon.icns
+docs/          README icon and screenshots
 ```
 
-SOLID highlights: clipboard access (`ClipboardGateway`), hotkeys (`GlobalHotkeyService`)
-and paste (`PasteService`) are interfaces with macOS implementations isolated in
-`platform/`, `hotkey/` and `paste/` — core logic (`ClipboardService`, repositories,
-emoji services, settings) is pure Java and fully unit-tested without a real clipboard.
+Clipboard access (`ClipboardGateway`), hotkeys (`GlobalHotkeyService`) and paste
+(`PasteService`) are interfaces with macOS implementations isolated in `platform/`,
+`hotkey/` and `paste/`. Core logic (`ClipboardService`, repositories, emoji services,
+settings) is plain Java and unit-tested without a real clipboard.
 
 ## Tests
 
-`./gradlew test` — covers dedupe, history limits, pinning, deletion, clearing, persistence
-(SQLite reopen), search, retention cleanup, emoji search/categories, recent emojis +
-ranking + trim, settings persistence, hash stability and shortcut parsing.
+`./gradlew test` covers dedupe, history limits, pinning, collections (naming rules,
+filing, deletion, upgrades), deletion, clearing, persistence across reopen, search,
+retention, the clipboard monitor, rich-text round trips, emoji search and categories,
+recent-emoji ranking, settings persistence, hash stability and shortcut parsing.
+`./gradlew uiTest` exercises the Settings window and asynchronous history loading on a
+real desktop.
+
+## License
+
+[MIT](LICENSE) © 2026 Samuel Jarai

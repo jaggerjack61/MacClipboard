@@ -32,6 +32,8 @@ public final class ClipboardMonitor implements AutoCloseable {
             });
 
     private volatile ScheduledFuture<?> future;
+    private ScheduledFuture<?> maintenance;
+    private long lastChangeCount = -1;
 
     public ClipboardMonitor(ClipboardGateway gateway, ClipboardService service,
                             ApplicationSettings settings, PrivacyService privacy) {
@@ -47,6 +49,7 @@ public final class ClipboardMonitor implements AutoCloseable {
         }
         int interval = Math.max(250, settings.pollIntervalMs());
         future = executor.scheduleWithFixedDelay(this::poll, interval, interval, TimeUnit.MILLISECONDS);
+        maintenance = executor.scheduleWithFixedDelay(this::maintainHistory, 0, 1, TimeUnit.MINUTES);
     }
 
     public synchronized void stop() {
@@ -54,25 +57,47 @@ public final class ClipboardMonitor implements AutoCloseable {
             future.cancel(false);
             future = null;
         }
+        if (maintenance != null) {
+            maintenance.cancel(false);
+            maintenance = null;
+        }
     }
 
     public boolean isRunning() {
         return future != null;
     }
 
-    private void poll() {
+    void poll() {
         try {
             if (!settings.monitoringEnabled() || privacy.isPaused()) {
                 return;
             }
+            long revision = gateway.changeCount();
+            if (revision >= 0 && revision == lastChangeCount) {
+                return;
+            }
             gateway.read().ifPresent(snapshot -> {
-                if (!privacy.shouldIgnore(snapshot)) {
-                    service.ingest(snapshot);
+                // If another app copied while we decoded, retry the new revision.
+                if (revision >= 0 && gateway.changeCount() != revision) {
+                    return;
                 }
+                if (!privacy.shouldIgnore(snapshot)) {
+                    service.ingest(snapshot, revision >= 0 && lastChangeCount >= 0);
+                }
+                lastChangeCount = revision;
             });
         } catch (Exception e) {
             // Never leak clipboard content into logs; only structural failures.
             LOG.log(Level.FINE, () -> "clipboard poll skipped: " + e.getClass().getSimpleName());
+        }
+    }
+
+    /** Retention continues even while capture is paused or the clipboard is idle. */
+    void maintainHistory() {
+        try {
+            service.applyLimits();
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "History cleanup failed: " + e.getClass().getSimpleName());
         }
     }
 

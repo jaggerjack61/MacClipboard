@@ -1,13 +1,18 @@
 package tray;
 
-import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.Image;
 import java.awt.MenuItem;
 import java.awt.PopupMenu;
 import java.awt.RenderingHints;
 import java.awt.SystemTray;
 import java.awt.TrayIcon;
+import java.awt.geom.Line2D;
+import java.awt.geom.Path2D;
+import java.awt.geom.RoundRectangle2D;
+import java.awt.image.BaseMultiResolutionImage;
 import java.awt.image.BufferedImage;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -20,6 +25,11 @@ import javafx.application.Platform;
 public final class MenuBarService {
 
     private static final Logger LOG = Logger.getLogger(MenuBarService.class.getName());
+
+    static {
+        // Read when the first TrayIcon is created: lets macOS tint the icon like native ones.
+        System.setProperty("apple.awt.enableTemplateImages", "true");
+    }
 
     private final TrayIcon trayIcon;
     private PopupMenu menu;
@@ -103,26 +113,41 @@ public final class MenuBarService {
     }
 
     /**
-     * Draws a small template-style clipboard glyph, matching macOS menu-bar icons.
+     * The menu-bar glyph: a clipboard with two lines, matching the app's line icons.
+     * Drawn black-on-transparent at 1x and 2x as a macOS template image, so the system
+     * tints it for light/dark menu bars and the selected state.
      */
-    private static BufferedImage createIconImage() {
-        int size = 22;
+    private static Image createIconImage() {
+        return new BaseMultiResolutionImage(drawIcon(1), drawIcon(2));
+    }
+
+    private static BufferedImage drawIcon(int scale) {
+        int size = 22 * scale;
         BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
-        g.setComposite(AlphaComposite.Clear);
-        g.fillRect(0, 0, size, size);
-        g.setComposite(AlphaComposite.SrcOver);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setColor(new Color(70, 70, 74));
-        g.setStroke(new java.awt.BasicStroke(1.5f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
-        // board
-        g.drawRoundRect(4, 4, 13, 15, 4, 4);
-        // clip
-        g.drawRoundRect(8, 2, 5, 4, 2, 2);
-        // lines
-        g.drawLine(7, 10, 14, 10);
-        g.drawLine(7, 13, 14, 13);
-        g.drawLine(7, 16, 12, 16);
+        g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+        // Lay a 24-unit grid over the central 18 pt of the 22 pt slot.
+        double unit = scale * 18 / 24.0;
+        g.translate(scale * 2, scale * 2);
+        g.scale(unit, unit);
+        g.setColor(Color.BLACK);
+        g.setStroke(new BasicStroke(1.9f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        Path2D board = new Path2D.Double();
+        board.moveTo(16, 4);
+        board.lineTo(18, 4);
+        board.quadTo(20, 4, 20, 6);
+        board.lineTo(20, 20);
+        board.quadTo(20, 22, 18, 22);
+        board.lineTo(6, 22);
+        board.quadTo(4, 22, 4, 20);
+        board.lineTo(4, 6);
+        board.quadTo(4, 4, 6, 4);
+        board.lineTo(8, 4);
+        g.draw(board);
+        g.draw(new RoundRectangle2D.Double(8, 2, 8, 4, 2, 2));
+        g.draw(new Line2D.Double(8, 12, 16, 12));
+        g.draw(new Line2D.Double(8, 16, 14, 16));
         g.dispose();
         return image;
     }

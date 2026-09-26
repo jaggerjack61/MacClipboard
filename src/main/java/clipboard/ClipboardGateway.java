@@ -8,6 +8,11 @@ import java.util.Optional;
  */
 public interface ClipboardGateway {
 
+    /** Cheap content revision, or -1 when the platform cannot provide one. */
+    default long changeCount() {
+        return -1;
+    }
+
     /**
      * Reads the current clipboard content.
      *

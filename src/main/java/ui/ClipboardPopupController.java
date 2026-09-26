@@ -1,6 +1,6 @@
 package ui;
 
-import model.ClipboardItem;
+import model.ClipboardPreview;
 import clipboard.ClipboardService;
 import config.ApplicationSettings;
 import emoji.Emoji;
@@ -10,6 +10,12 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.function.Consumer;
+import java.util.concurrent.Executor;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
@@ -21,6 +27,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
+import platform.MacNative;
 import paste.PasteService;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -34,10 +42,15 @@ public final class ClipboardPopupController {
 
     public enum Tab { CLIPBOARD, EMOJI }
 
+    private static final String TITLE = "Clipboard History";
     private static final double WIDTH = 440;
     private static final double HEIGHT = 560;
+    private static final double CORNER_RADIUS = 12;
 
     private final Stage stage = new Stage(StageStyle.TRANSPARENT);
+    private final Timeline fadeIn = new Timeline(
+            new KeyFrame(Duration.ZERO, new KeyValue(stage.opacityProperty(), 0)),
+            new KeyFrame(Duration.millis(120), new KeyValue(stage.opacityProperty(), 1, Interpolator.EASE_OUT)));
     private final StackPane contentArea = new StackPane();
     private final Label clipboardTabButton = new Label("Clipboard");
     private final Label emojiTabButton = new Label("Emoji");
@@ -45,7 +58,7 @@ public final class ClipboardPopupController {
     private final EmojiTabController emojiTab;
     private final ApplicationSettings settings;
     private final PasteService pasteService;
-    private final Consumer<ClipboardItem> onClipboardSelected;
+    private final Consumer<Long> onClipboardSelected;
     private final Consumer<Emoji> onEmojiSelected;
 
     private Tab activeTab = Tab.CLIPBOARD;
@@ -59,20 +72,22 @@ public final class ClipboardPopupController {
     public ClipboardPopupController(ClipboardService clipboardService, EmojiService emojiService,
                                     RecentEmojiService recentEmojiService, ApplicationSettings settings,
                                     PasteService pasteService,
-                                    Consumer<ClipboardItem> onClipboardSelected,
-                                    Consumer<Emoji> onEmojiSelected) {
+                                    Consumer<Long> onClipboardSelected,
+                                    Consumer<Emoji> onEmojiSelected, Executor background) {
         this.settings = settings;
         this.pasteService = pasteService;
         this.onClipboardSelected = onClipboardSelected;
         this.onEmojiSelected = onEmojiSelected;
-        this.clipboardTab = new ClipboardTabController(clipboardService, this);
+        this.clipboardTab = new ClipboardTabController(clipboardService, this, background);
         this.emojiTab = new EmojiTabController(emojiService, recentEmojiService, settings, this);
         buildStage();
     }
 
     private void buildStage() {
-        clipboardTabButton.getStyleClass().add("tab-button");
-        emojiTabButton.getStyleClass().add("tab-button");
+        clipboardTabButton.getStyleClass().add("segment");
+        emojiTabButton.getStyleClass().add("segment");
+        clipboardTabButton.setTooltip(new Tooltip("Clipboard  \u23181"));
+        emojiTabButton.setTooltip(new Tooltip("Emoji  \u23182"));
         clipboardTabButton.setFocusTraversable(true);
         emojiTabButton.setFocusTraversable(true);
         clipboardTabButton.setOnMouseClicked(e -> showTab(Tab.CLIPBOARD));
@@ -91,23 +106,22 @@ public final class ClipboardPopupController {
             }
         });
 
-        Label hint = new Label("⌘1  ⌘2   ·   ⎋ to close");
-        hint.getStyleClass().add("hint");
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox header = new HBox(18, clipboardTabButton, emojiTabButton, spacer, hint);
-        header.getStyleClass().add("popup-header");
-
         HBox topBar = buildTopBar();
 
         contentArea.getChildren().addAll(clipboardTab.getNode(), emojiTab.getNode());
+        VBox.setVgrow(contentArea, Priority.ALWAYS);
 
-        VBox root = new VBox(topBar, header, contentArea);
+        VBox root = new VBox(topBar, contentArea);
         root.getStyleClass().add("popup-root");
+        // Keep row hover/selection backgrounds inside the rounded corners.
+        javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(WIDTH, HEIGHT);
+        clip.setArcWidth(CORNER_RADIUS * 2);
+        clip.setArcHeight(CORNER_RADIUS * 2);
+        root.setClip(clip);
 
         Scene scene = new Scene(root, WIDTH, HEIGHT);
         scene.setFill(null);
-        scene.getStylesheets().add(ClipboardPopupController.class.getResource("/ui/clipboard.css").toExternalForm());
+        Theme.apply(scene);
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.ESCAPE), this::hidePopup);
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.DIGIT1, KeyCombination.SHORTCUT_DOWN),
                 () -> showTab(Tab.CLIPBOARD));
@@ -123,7 +137,7 @@ public final class ClipboardPopupController {
 
         stage.setScene(scene);
         stage.setAlwaysOnTop(true);
-        stage.setTitle("Clipboard History");
+        stage.setTitle(TITLE);
         updateTabStyles();
         showTab(Tab.CLIPBOARD);
     }
@@ -138,7 +152,7 @@ public final class ClipboardPopupController {
      * way to move or dismiss it with the mouse.
      */
     private HBox buildTopBar() {
-        Label closeLight = new Label("\u00d7");
+        Label closeLight = new Label("\u2715");
         closeLight.getStyleClass().addAll("traffic-light", "close-light");
         closeLight.setTooltip(new Tooltip("Close"));
         closeLight.setFocusTraversable(false);
@@ -161,14 +175,15 @@ public final class ClipboardPopupController {
             }
         });
 
-        Label title = new Label("Clipboard History");
-        title.getStyleClass().add("topbar-title");
+        HBox lights = new HBox(8, closeLight, minLight);
+        lights.setAlignment(Pos.CENTER_LEFT);
+        HBox segmented = new HBox(clipboardTabButton, emojiTabButton);
+        segmented.getStyleClass().add("segmented");
+        // Mirror the lights' width on the right so the tabs stay centered.
+        Region balance = new Region();
+        balance.minWidthProperty().bind(lights.widthProperty());
 
-        Region leftSpacer = new Region();
-        Region rightSpacer = new Region();
-        HBox.setHgrow(leftSpacer, Priority.ALWAYS);
-        HBox.setHgrow(rightSpacer, Priority.ALWAYS);
-        HBox bar = new HBox(8, closeLight, minLight, leftSpacer, title, rightSpacer);
+        HBox bar = new HBox(lights, Controls.hSpacer(), segmented, Controls.hSpacer(), balance);
         bar.getStyleClass().add("popup-topbar");
 
         // Drag anywhere on the bar to move the window.
@@ -210,14 +225,19 @@ public final class ClipboardPopupController {
             positionNearMouse();
         }
         activeTab = tab;
+        clipboardTab.resetFilter();
         showTab(tab, true);
+        Theme.apply(stage.getScene());
+        stage.setOpacity(0);
         stage.show();
         stage.toFront();
         visible = true;
+        fadeIn.playFromStart();
         javafx.application.Platform.runLater(() -> {
+            MacNative.refreshWindowShadow(TITLE);
             stage.requestFocus();
             if (tab == Tab.CLIPBOARD) {
-                clipboardTab.refresh();
+                clipboardTab.focus();
             } else {
                 emojiTab.refresh();
             }
@@ -230,9 +250,9 @@ public final class ClipboardPopupController {
     }
 
     /** Called by tab controllers when the user picks a clipboard item. */
-    public void select(ClipboardItem item) {
+    public void select(ClipboardPreview item) {
         hidePopup();
-        onClipboardSelected.accept(item);
+        onClipboardSelected.accept(item.id());
     }
 
     /** Called by tab controllers when the user picks an emoji. */

@@ -6,20 +6,29 @@ import hotkey.GlobalHotkeyService;
 import hotkey.ShortcutModifier;
 import java.util.List;
 import java.util.Optional;
-import javafx.geometry.Insets;
+import java.util.concurrent.Executor;
+import javafx.animation.PauseTransition;
+import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import paste.PasteService;
 import platform.LaunchAtLogin;
 import platform.MacNative;
@@ -40,44 +49,58 @@ public final class SettingsController {
     private final ClipboardService clipboardService;
     private final GlobalHotkeyService hotkeys;
     private final PasteService pasteService;
+    private final Executor background;
+    private static final PseudoClass GRANTED = PseudoClass.getPseudoClass("granted");
+
+    private final Label permissionStatus = new Label();
+    private final Region permissionDot = new Region();
     private Stage stage;
 
     public SettingsController(ApplicationSettings settings, ClipboardService clipboardService,
-                              GlobalHotkeyService hotkeys, PasteService pasteService) {
+                              GlobalHotkeyService hotkeys, PasteService pasteService, Executor background) {
         this.settings = settings;
         this.clipboardService = clipboardService;
         this.hotkeys = hotkeys;
         this.pasteService = pasteService;
+        this.background = background;
     }
 
     public void show() {
         if (stage == null) {
             stage = buildStage();
         }
+        Theme.apply(stage.getScene());
+        refreshPermissionStatus();
         stage.show();
         stage.toFront();
         stage.requestFocus();
     }
 
     private Stage buildStage() {
-        Label title = new Label("Clipboard History Settings");
-        title.getStyleClass().add("settings-title");
-
         // History size
         Spinner<Integer> maxHistory = new Spinner<>();
-        maxHistory.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(10, 500, 10, settings.maxHistory()));
+        maxHistory.setId("history-size");
+        maxHistory.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(10, 500, settings.maxHistory(), 10));
         maxHistory.setEditable(true);
-        maxHistory.setPrefWidth(90);
-        maxHistory.valueProperty().addListener((o, old, v) -> settings.setMaxHistory(v));
+        maxHistory.setPrefWidth(96);
+        maxHistory.valueProperty().addListener((o, old, v) -> {
+            settings.setMaxHistory(v);
+            background.execute(clipboardService::applyLimits);
+        });
 
         // Retention
         ChoiceBox<String> retention = new ChoiceBox<>();
+        retention.setId("retention");
         retention.getItems().addAll("Never", "1 day", "7 days", "30 days", "90 days");
         retention.setValue(mapRetentionToLabel(settings.retentionDays()));
-        retention.setOnAction(e -> settings.setRetentionDays(mapLabelToRetention(retention.getValue())));
+        retention.setOnAction(e -> {
+            settings.setRetentionDays(mapLabelToRetention(retention.getValue()));
+            background.execute(clipboardService::applyRetention);
+        });
 
         // Shortcut
         ChoiceBox<String> shortcut = new ChoiceBox<>();
+        shortcut.setId("shortcut");
         for (String preset : SHORTCUT_PRESETS) {
             shortcut.getItems().add(formatShortcut(preset));
         }
@@ -92,45 +115,59 @@ public final class SettingsController {
         });
 
         // Toggles
-        CheckBox launch = new CheckBox("Launch at login");
-        launch.setSelected(settings.launchAtLogin());
+        CheckBox launch = toggle(settings.launchAtLogin());
         launch.setOnAction(e -> {
             settings.setLaunchAtLogin(launch.isSelected());
             applyLaunchAtLogin(launch.isSelected());
         });
 
-        CheckBox autoPaste = new CheckBox("Automatically paste after selection (requires Accessibility permission)");
-        autoPaste.setSelected(settings.autoPaste());
+        CheckBox autoPaste = toggle(settings.autoPaste());
         autoPaste.setOnAction(e -> settings.setAutoPaste(autoPaste.isSelected()));
 
-        CheckBox persist = new CheckBox("Store clipboard history between restarts");
-        persist.setSelected(settings.persistHistory());
+        CheckBox persist = toggle(settings.persistHistory());
         persist.setOnAction(e -> settings.setPersistHistory(persist.isSelected()));
 
-        CheckBox rememberEmoji = new CheckBox("Remember recently used emojis");
-        rememberEmoji.setSelected(settings.rememberRecentEmojis());
+        CheckBox rememberEmoji = toggle(settings.rememberRecentEmojis());
         rememberEmoji.setOnAction(e -> settings.setRememberRecentEmojis(rememberEmoji.isSelected()));
 
         Spinner<Integer> emojiLimit = new Spinner<>();
-        emojiLimit.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(4, 200, 4,
-                settings.maxRecentEmojis()));
+        emojiLimit.setId("recent-emoji-limit");
+        emojiLimit.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(4, 200,
+                settings.maxRecentEmojis(), 4));
         emojiLimit.setEditable(true);
-        emojiLimit.setPrefWidth(90);
+        emojiLimit.setPrefWidth(96);
         emojiLimit.valueProperty().addListener((o, old, v) -> settings.setMaxRecentEmojis(v));
 
-        Button clear = new Button("Clear clipboard history now");
-        clear.setOnAction(e -> clipboardService.clearUnpinned());
+        Button clear = new Button("Clear History");
+        clear.getStyleClass().add("destructive");
+        PauseTransition clearedReset = new PauseTransition(Duration.seconds(1.6));
+        clearedReset.setOnFinished(e -> {
+            clear.setText("Clear History");
+            clear.setDisable(false);
+        });
+        clear.setOnAction(e -> {
+            background.execute(clipboardService::clearUnpinned);
+            clear.setText("Cleared");
+            clear.setDisable(true);
+            clearedReset.playFromStart();
+        });
 
-        Label permStatus = new Label(pasteService.canAutoPaste()
-                ? "✓ Accessibility permission granted"
-                : "✗ Accessibility permission not granted");
-        permStatus.getStyleClass().add("hint");
-        Button grant = new Button("Open System Settings…");
+        Button grant = new Button("Open System Settings\u2026");
         grant.setOnAction(e -> MacNative.openAccessibilitySettings());
+        permissionStatus.getStyleClass().add("settings-detail");
+        permissionDot.getStyleClass().add("status-dot");
+        HBox statusLine = new HBox(6, permissionDot, permissionStatus);
+        statusLine.setAlignment(Pos.CENTER_LEFT);
+        Label permissionDetail = new Label("Needed for auto-paste and the global shortcut");
+        permissionDetail.getStyleClass().add("settings-detail");
+        permissionDetail.setWrapText(true);
+        VBox status = new VBox(2, permissionDetail, statusLine);
+        refreshPermissionStatus();
 
         // About
-        Label aboutTitle = new Label("About");
-        aboutTitle.getStyleClass().add("section-header");
+        String version = SettingsController.class.getPackage().getImplementationVersion();
+        Label aboutName = new Label("Clipboard History " + (version != null ? version : "(development build)"));
+        aboutName.getStyleClass().add("settings-about-name");
         Label aboutAuthor = new Label("Clipboard History is free, open source software, "
                 + "created by Samuel Jarai.");
         aboutAuthor.getStyleClass().add("settings-label");
@@ -139,30 +176,134 @@ public final class SettingsController {
         aboutRepo.setFocusTraversable(false);
         aboutRepo.setOnAction(e -> openInBrowser(ABOUT_REPO_URL));
         Label aboutLicense = new Label("Source is available under the license in the repository.");
-        aboutLicense.getStyleClass().add("hint");
+        aboutLicense.getStyleClass().add("settings-detail");
         aboutLicense.setWrapText(true);
+        VBox about = new VBox(4, aboutName, aboutAuthor, aboutRepo, aboutLicense);
+        about.getStyleClass().add("settings-about");
 
-        HBox shortcutRow = row("Global shortcut:", shortcut);
-        VBox box = new VBox(12, title,
-                row("History size:", maxHistory),
-                row("Retention period:", retention),
-                shortcutRow,
-                launch, autoPaste, persist, rememberEmoji,
-                row("Recent emoji limit:", emojiLimit),
-                clear,
-                new Label("Clipboard data never leaves this machine."),
-                new HBox(10, permStatus, grant),
-                aboutTitle, aboutAuthor, aboutRepo, aboutLicense);
-        box.setPadding(new Insets(18));
+        Label privacy = new Label("Clipboard data never leaves this Mac.");
+        privacy.getStyleClass().add("settings-footnote");
+
+        VBox box = new VBox(header(),
+                sectionTitle("General"),
+                card(row("Global shortcut", "Opens clipboard history from any app", shortcut),
+                        row("Launch at login", launch),
+                        row("Paste automatically", "Pastes into the previous app after you pick an item",
+                                autoPaste),
+                        row("Accessibility access", status, grant)),
+                sectionTitle("History"),
+                card(row("History size", "Maximum number of items kept", maxHistory),
+                        row("Remove items older than", retention),
+                        row("Keep history after restart", "Stored locally. Applies after restarting the app",
+                                persist),
+                        row("Clear history", "Removes everything except pinned items", clear)),
+                privacy,
+                sectionTitle("Emoji"),
+                card(row("Remember recently used", rememberEmoji),
+                        row("Recent emoji limit", emojiLimit)),
+                sectionTitle("About"),
+                card(about));
         box.getStyleClass().add("settings-root");
 
-        Scene scene = new Scene(box, 480, 560);
-        scene.getStylesheets().add(SettingsController.class.getResource("/ui/clipboard.css").toExternalForm());
+        ScrollPane scroll = new ScrollPane(box);
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.getStyleClass().add("settings-scroll");
+
+        Scene scene = new Scene(scroll, 520, 640);
+        Theme.apply(scene);
         Stage st = new Stage();
         st.initModality(Modality.NONE);
         st.setTitle("Settings");
+        st.setMinWidth(460);
+        st.setMinHeight(360);
         st.setScene(scene);
         return st;
+    }
+
+    private void refreshPermissionStatus() {
+        boolean granted = pasteService.canAutoPaste();
+        permissionStatus.setText(granted ? "Granted" : "Not granted");
+        permissionDot.pseudoClassStateChanged(GRANTED, granted);
+    }
+
+    private static HBox header() {
+        ImageView badge = new ImageView(new Image(
+                SettingsController.class.getResource("/ui/app-icon.png").toExternalForm(), 104, 104, true, true));
+        // The artwork includes the macOS icon margin, so it renders larger than the text column.
+        badge.setFitWidth(52);
+        badge.setFitHeight(52);
+        Label title = new Label("Clipboard History");
+        title.getStyleClass().add("settings-title");
+        Label subtitle = new Label("Settings");
+        subtitle.getStyleClass().add("settings-subtitle");
+        VBox text = new VBox(1, title, subtitle);
+        text.setAlignment(Pos.CENTER_LEFT);
+        HBox header = new HBox(8, badge, text);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.getStyleClass().add("settings-header");
+        return header;
+    }
+
+    private static Label sectionTitle(String text) {
+        Label label = new Label(text);
+        label.getStyleClass().add("section-header");
+        return label;
+    }
+
+    /** A rounded group of rows separated by hairlines. */
+    private static VBox card(Node... rows) {
+        VBox card = new VBox();
+        card.getStyleClass().add("settings-card");
+        for (int i = 0; i < rows.length; i++) {
+            if (i > 0) {
+                Region divider = new Region();
+                divider.getStyleClass().add("card-divider");
+                card.getChildren().add(divider);
+            }
+            card.getChildren().add(rows[i]);
+        }
+        return card;
+    }
+
+    private static HBox row(String title, Node control) {
+        return row(title, (Node) null, control);
+    }
+
+    private static HBox row(String title, String detail, Node control) {
+        Label detailLabel = null;
+        if (detail != null) {
+            detailLabel = new Label(detail);
+            detailLabel.getStyleClass().add("settings-detail");
+            detailLabel.setWrapText(true);
+        }
+        return row(title, detailLabel, control);
+    }
+
+    /** Title (and optional detail line) on the left, the control right-aligned. */
+    private static HBox row(String title, Node detail, Node control) {
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("settings-label");
+        VBox text = detail == null ? new VBox(titleLabel) : new VBox(2, titleLabel, detail);
+        text.setAlignment(Pos.CENTER_LEFT);
+        text.setMinWidth(0);
+        HBox.setHgrow(text, Priority.ALWAYS);
+        if (control instanceof Region region) {
+            // Text wraps first; controls never truncate.
+            region.setMinWidth(Region.USE_PREF_SIZE);
+        }
+        HBox row = new HBox(16, text, control);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.getStyleClass().add("settings-row");
+        return row;
+    }
+
+    /** A CheckBox styled as a macOS switch (see .switch in clipboard.css). */
+    private static CheckBox toggle(boolean selected) {
+        CheckBox toggle = new CheckBox();
+        toggle.getStyleClass().add("switch");
+        toggle.setSelected(selected);
+        return toggle;
     }
 
     /** Hotkey re-registration needs the popup toggle callback; injected by the app. */
@@ -179,15 +320,6 @@ public final class SettingsController {
 
     public void setHotkeyCallback(Runnable callback) {
         this.hotkeyCallback = callback;
-    }
-
-    private static HBox row(String label, javafx.scene.Node control) {
-        Label l = new Label(label);
-        l.getStyleClass().add("settings-label");
-        HBox h = new HBox(10, l, control);
-        h.setAlignment(Pos.CENTER_LEFT);
-        h.getStyleClass().add("settings-row");
-        return h;
     }
 
     private static String mapRetentionToLabel(int days) {

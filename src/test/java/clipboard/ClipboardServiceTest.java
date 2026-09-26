@@ -2,6 +2,7 @@ package clipboard;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import config.ApplicationSettings;
@@ -10,6 +11,8 @@ import java.util.Map;
 import java.util.Optional;
 import model.ClipboardContentType;
 import model.ClipboardItem;
+import model.ClipboardPreview;
+import model.HistoryFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import repository.InMemoryClipboardRepository;
@@ -174,7 +177,103 @@ class ClipboardServiceTest {
         assertEquals("Image 800×600", item.preview());
     }
 
+    @Test
+    void unchangedClipboardStaysDeletedButCanBeCopiedAgainAfterAChange() {
+        var snapshot = ClipboardSnapshot.text("deleted", null);
+        var item = service.ingest(snapshot).orElseThrow();
+        service.delete(item.id());
+        assertTrue(service.ingest(snapshot).isEmpty());
+        assertEquals(0, service.count());
+        service.ingest(ClipboardSnapshot.text("another copy", null));
+        assertTrue(service.ingest(snapshot).isPresent());
+        assertEquals(2, service.count());
+    }
+
+    @Test
+    void unchangedClipboardStaysCleared() {
+        var snapshot = ClipboardSnapshot.text("clear me", null);
+        service.ingest(snapshot);
+        service.clearUnpinned();
+        assertTrue(service.ingest(snapshot).isEmpty());
+        assertEquals(0, service.count());
+        var next = ClipboardSnapshot.text("clear this too", null);
+        service.ingest(next);
+        service.clearAll();
+        assertTrue(service.ingest(next).isEmpty());
+        assertEquals(0, service.count());
+    }
+
+    @Test
+    void clearingImmediatelyAfterRestartDoesNotRecaptureThePreviousLatestItem() {
+        var snapshot = ClipboardSnapshot.text("previous session", null);
+        service.ingest(snapshot);
+        var restarted = new ClipboardService(repository, settings);
+        restarted.clearAll();
+        assertTrue(restarted.ingest(snapshot).isEmpty());
+        assertEquals(0, restarted.count());
+    }
+
+    @Test
+    void richTextVariantsAreStoredAndRestoredIndependently() {
+        var bold = ClipboardSnapshot.text("hello", "<b>hello</b>");
+        var italic = ClipboardSnapshot.text("hello", "<i>hello</i>");
+        var first = service.ingest(bold).orElseThrow();
+        service.ingest(italic).orElseThrow();
+        assertEquals(2, service.count());
+        assertEquals(italic, ClipboardService.toSnapshot(service.history("").getFirst()));
+        assertEquals(first.id(), service.ingest(bold).orElseThrow().id());
+        assertEquals(2, service.count());
+    }
+
+    @Test
+    void pinnedItemsComeFirstWithoutBreakingDedupe() {
+        var old = service.ingest(ClipboardSnapshot.text("pinned old", null)).orElseThrow();
+        service.togglePin(old.id());
+        var latest = ClipboardSnapshot.text("unpinned latest", null);
+        service.ingest(latest);
+        assertEquals(old.id(), service.history("").getFirst().id());
+        assertTrue(service.ingest(latest).isEmpty());
+        var recopy = service.ingest(ClipboardSnapshot.text("pinned old", null)).orElseThrow();
+        assertEquals(old.id(), recopy.id());
+        assertTrue(service.ingest(ClipboardSnapshot.text("pinned old", null)).isEmpty());
+    }
+
     /** Simple in-memory SettingsStore (separate from repositories under test). */
+    @Test
+    void collectionNamesMustBeNonBlankAndUniqueIgnoringCase() {
+        var work = service.createCollection("  Work  ");
+        assertEquals("Work", work.name(), "names are trimmed");
+        assertTrue(service.collectionNameProblem("   ", null).isPresent());
+        assertTrue(service.collectionNameProblem("WORK", null).isPresent());
+        assertFalse(service.collectionNameProblem("WORK", work.id()).isPresent(), "renaming to itself is fine");
+        assertFalse(service.collectionNameProblem("Recipes \uD83C\uDF5D / 2026!", null).isPresent());
+        assertThrows(IllegalArgumentException.class, () -> service.createCollection("work"));
+        var other = service.createCollection("Other");
+        assertThrows(IllegalArgumentException.class, () -> service.renameCollection(other.id(), "Work"));
+        assertTrue(service.renameCollection(other.id(), "Personal"));
+    }
+
+    @Test
+    void itemsInCollectionsSurviveLimitsClearingAndRecopy() {
+        settings.setMaxHistory(10);
+        var recipes = service.createCollection("Recipes");
+        ClipboardItem kept = service.ingest(ClipboardSnapshot.text("pasta sauce", null)).orElseThrow();
+        assertTrue(service.moveToCollection(kept.id(), recipes.id()));
+        for (int i = 0; i < 30; i++) {
+            service.ingest(ClipboardSnapshot.text("filler " + i, null));
+        }
+        service.clearUnpinned();
+        assertEquals(List.of(kept.id()), service.previews("", HistoryFilter.collection(recipes.id()))
+                .stream().map(ClipboardPreview::id).toList());
+        // Copying it again moves it to the top without leaving the collection.
+        service.ingest(ClipboardSnapshot.text("other", null));
+        service.ingest(ClipboardSnapshot.text("pasta sauce", null));
+        assertEquals(recipes.id(), service.findById(kept.id()).orElseThrow().collectionId());
+        // Unpinning removes it from the collection.
+        service.togglePin(kept.id());
+        assertTrue(service.previews("", HistoryFilter.collection(recipes.id())).isEmpty());
+    }
+
     private static final class MapSettingsStore implements SettingsStore {
         private final Map<String, String> data = new java.util.HashMap<>();
 

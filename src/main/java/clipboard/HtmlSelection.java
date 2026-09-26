@@ -3,10 +3,6 @@ package clipboard;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Provides both a plain-text and an HTML flavor so that pasting into rich-text
@@ -14,14 +10,14 @@ import java.nio.charset.StandardCharsets;
  */
 final class HtmlSelection implements Transferable {
 
-    private static final DataFlavor HTML_FLAVOR = htmlFlavor();
+    static final DataFlavor HTML_FLAVOR = DataFlavor.selectionHtmlFlavor;
 
     private final String text;
-    private final byte[] htmlBytes;
+    private final String html;
 
     HtmlSelection(String text, String html) {
         this.text = text == null ? "" : text;
-        this.htmlBytes = (html == null ? "" : html).getBytes(StandardCharsets.UTF_8);
+        this.html = html == null ? "" : html;
     }
 
     @Override
@@ -40,17 +36,9 @@ final class HtmlSelection implements Transferable {
             return text;
         }
         if (HTML_FLAVOR.equals(flavor)) {
-            return htmlBytes;
+            return html;
         }
         throw new UnsupportedFlavorException(flavor);
     }
 
-    private static DataFlavor htmlFlavor() {
-        try {
-            // Match the standard HTML clipboard flavor used by AWT readers.
-            return new DataFlavor("text/html;class=[B;charset=" + StandardCharsets.UTF_8 + ";");
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException(e);
-        }
-    }
 }

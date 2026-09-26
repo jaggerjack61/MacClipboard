@@ -96,6 +96,20 @@ public final class MacNative {
 
     // ---- Frontmost application ---------------------------------------------------
 
+    /** NSPasteboard metadata lets the monitor avoid decoding unchanged payloads. */
+    public static long clipboardChangeCount() {
+        if (!ObjCRuntime.isAvailable()) {
+            return -1;
+        }
+        Pointer pool = ObjCRuntime.msg(ObjCRuntime.cls("NSAutoreleasePool"), "new");
+        try {
+            Pointer board = ObjCRuntime.msg(ObjCRuntime.cls("NSPasteboard"), "generalPasteboard");
+            return board == null ? -1 : ObjCRuntime.msgLong(board, "changeCount");
+        } finally {
+            ObjCRuntime.msg(pool, "drain");
+        }
+    }
+
     /**
      * Captures the currently active (frontmost) application, returning a token that can
      * later be passed to {@link #restoreFrontmost(Object)}. Uses the private
@@ -195,6 +209,54 @@ public final class MacNative {
             }
         } catch (Throwable t) {
             log("could not set accessory activation policy", t);
+        }
+    }
+
+    // ---- Appearance --------------------------------------------------------------
+
+    /** True when macOS is in Dark Mode (the global AppleInterfaceStyle default is "Dark"). */
+    public static boolean isDarkMode() {
+        if (!ObjCRuntime.isAvailable()) {
+            return false;
+        }
+        Pointer pool = ObjCRuntime.msg(ObjCRuntime.cls("NSAutoreleasePool"), "new");
+        try {
+            Pointer defaults = ObjCRuntime.msg(ObjCRuntime.cls("NSUserDefaults"), "standardUserDefaults");
+            Pointer key = ObjCRuntime.msg(ObjCRuntime.cls("NSString"), "stringWithUTF8String:",
+                    "AppleInterfaceStyle");
+            if (defaults == null || key == null) {
+                return false;
+            }
+            return "Dark".equalsIgnoreCase(ObjCRuntime.toJavaString(
+                    ObjCRuntime.msg(defaults, "stringForKey:", key)));
+        } finally {
+            ObjCRuntime.msg(pool, "drain");
+        }
+    }
+
+    /**
+     * Gives the (borderless, transparent) window with this title a native drop shadow
+     * and recomputes it from the window's current alpha, so it follows rounded corners.
+     * JavaFX TRANSPARENT stages have no shadow by default. Must run on the FX thread,
+     * which is the AppKit main thread on macOS.
+     */
+    public static void refreshWindowShadow(String title) {
+        if (!ObjCRuntime.isAvailable() || title == null) {
+            return;
+        }
+        try {
+            Pointer nsApp = ObjCRuntime.msg(ObjCRuntime.cls("NSApplication"), "sharedApplication");
+            Pointer windows = ObjCRuntime.msg(nsApp, "windows");
+            long count = ObjCRuntime.msgLong(windows, "count");
+            for (long i = 0; i < count; i++) {
+                Pointer window = ObjCRuntime.msg(windows, "objectAtIndex:", i);
+                if (title.equals(ObjCRuntime.toJavaString(ObjCRuntime.msg(window, "title")))) {
+                    ObjCRuntime.msg(window, "setHasShadow:", 1);
+                    ObjCRuntime.msg(window, "invalidateShadow");
+                }
+            }
+        } catch (Throwable t) {
+            log("could not update window shadow", t);
         }
     }
 

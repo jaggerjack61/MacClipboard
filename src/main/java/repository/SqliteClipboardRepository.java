@@ -9,8 +9,11 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import model.ClipboardCollection;
 import model.ClipboardContentType;
 import model.ClipboardItem;
+import model.ClipboardPreview;
+import model.HistoryFilter;
 
 /**
  * SQLite-backed {@link ClipboardRepository}. All clipboard data stays in the local
@@ -28,8 +31,9 @@ public final class SqliteClipboardRepository implements ClipboardRepository {
     public synchronized ClipboardItem insert(ClipboardItem item) {
         String sql = """
                 INSERT INTO clipboard_items
-                    (hash, content_type, preview, text_content, html_content, image, thumbnail, timestamp, pinned)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (hash, content_type, preview, text_content, html_content, image, thumbnail, timestamp, pinned,
+                     collection_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, item.hash());
@@ -41,6 +45,7 @@ public final class SqliteClipboardRepository implements ClipboardRepository {
             setBytesOrNull(ps, 7, item.thumbnail());
             ps.setLong(8, item.timestamp());
             ps.setInt(9, item.pinned() ? 1 : 0);
+            setLongOrNull(ps, 10, item.collectionId());
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -115,14 +120,142 @@ public final class SqliteClipboardRepository implements ClipboardRepository {
     }
 
     @Override
-    public synchronized boolean setPinned(long id, boolean pinned) {
-        String sql = "UPDATE clipboard_items SET pinned = ? WHERE id = ?";
+    public synchronized List<ClipboardPreview> findPreviews(String query, HistoryFilter filter, int limit) {
+        boolean filtered = query != null && !query.isBlank();
+        List<String> where = new ArrayList<>();
+        if (filtered) {
+            where.add("text_content LIKE ? ESCAPE '\\'");
+        }
+        switch (filter.kind()) {
+            case PINNED -> where.add("pinned = 1");
+            case COLLECTION -> where.add("collection_id = ?");
+            case ALL -> { }
+        }
+        String sql = "SELECT id, content_type, preview, thumbnail, timestamp, pinned, collection_id FROM clipboard_items"
+                + (where.isEmpty() ? "" : " WHERE " + String.join(" AND ", where))
+                + (filter.kind() == HistoryFilter.Kind.ALL
+                        ? " ORDER BY pinned DESC, timestamp DESC, id DESC LIMIT ?"
+                        : " ORDER BY timestamp DESC, id DESC LIMIT ?");
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            ps.setInt(1, pinned ? 1 : 0);
-            ps.setLong(2, id);
+            int idx = 1;
+            if (filtered) {
+                ps.setString(idx++, "%" + escapeLike(query.trim()) + "%");
+            }
+            if (filter.kind() == HistoryFilter.Kind.COLLECTION) {
+                ps.setLong(idx++, filter.collectionId());
+            }
+            ps.setInt(idx, Math.max(1, limit));
+            List<ClipboardPreview> result = new ArrayList<>();
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(new ClipboardPreview(rs.getLong("id"),
+                            parseType(rs.getString("content_type")), rs.getString("preview"),
+                            rs.getBytes("thumbnail"), rs.getLong("timestamp"), rs.getInt("pinned") != 0,
+                            collectionId(rs)));
+                }
+            }
+            return result;
+        } catch (SQLException e) {
+            throw new RepositoryException("Failed to query clipboard previews", e);
+        }
+    }
+
+    @Override
+    public synchronized boolean setPinned(long id, boolean pinned) {
+        String sql = pinned
+                ? "UPDATE clipboard_items SET pinned = 1 WHERE id = ?"
+                : "UPDATE clipboard_items SET pinned = 0, collection_id = NULL WHERE id = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setLong(1, id);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new RepositoryException("Failed to update pin state", e);
+        }
+    }
+
+    @Override
+    public synchronized boolean setCollection(long id, Long collectionId) {
+        String sql = "UPDATE clipboard_items SET pinned = 1, collection_id = ? WHERE id = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            setLongOrNull(ps, 1, collectionId);
+            ps.setLong(2, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RepositoryException("Failed to move item to collection", e);
+        }
+    }
+
+    @Override
+    public synchronized List<ClipboardCollection> findCollections() {
+        String sql = """
+                SELECT c.id, c.name, COUNT(i.id) AS item_count
+                FROM collections c LEFT JOIN clipboard_items i ON i.collection_id = c.id
+                GROUP BY c.id ORDER BY c.created, c.id
+                """;
+        try (Statement st = connection.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            List<ClipboardCollection> result = new ArrayList<>();
+            while (rs.next()) {
+                result.add(new ClipboardCollection(rs.getLong("id"), rs.getString("name"), rs.getInt("item_count")));
+            }
+            return result;
+        } catch (SQLException e) {
+            throw new RepositoryException("Failed to list collections", e);
+        }
+    }
+
+    @Override
+    public synchronized ClipboardCollection createCollection(String name) {
+        String sql = "INSERT INTO collections (name, created) VALUES (?, ?)";
+        try (PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, name);
+            ps.setLong(2, System.currentTimeMillis());
+            ps.executeUpdate();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (!keys.next()) {
+                    throw new RepositoryException("No id generated for collection");
+                }
+                return new ClipboardCollection(keys.getLong(1), name, 0);
+            }
+        } catch (SQLException e) {
+            throw new RepositoryException("Failed to create collection", e);
+        }
+    }
+
+    @Override
+    public synchronized boolean renameCollection(long id, String name) {
+        String sql = "UPDATE collections SET name = ? WHERE id = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, name);
+            ps.setLong(2, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RepositoryException("Failed to rename collection", e);
+        }
+    }
+
+    @Override
+    public synchronized boolean deleteCollection(long id) {
+        try {
+            connection.setAutoCommit(false);
+            // Explicit rather than relying on ON DELETE SET NULL, which needs foreign_keys on.
+            try (PreparedStatement unfile = connection.prepareStatement(
+                         "UPDATE clipboard_items SET collection_id = NULL WHERE collection_id = ?");
+                 PreparedStatement delete = connection.prepareStatement("DELETE FROM collections WHERE id = ?")) {
+                unfile.setLong(1, id);
+                unfile.executeUpdate();
+                delete.setLong(1, id);
+                boolean deleted = delete.executeUpdate() > 0;
+                connection.commit();
+                return deleted;
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new RepositoryException("Failed to delete collection", e);
         }
     }
 
@@ -216,6 +349,19 @@ public final class SqliteClipboardRepository implements ClipboardRepository {
         }
     }
 
+    private static void setLongOrNull(PreparedStatement ps, int index, Long value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.INTEGER);
+        } else {
+            ps.setLong(index, value);
+        }
+    }
+
+    private static Long collectionId(ResultSet rs) throws SQLException {
+        long id = rs.getLong("collection_id");
+        return rs.wasNull() ? null : id;
+    }
+
     private static String escapeLike(String value) {
         return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
@@ -232,6 +378,7 @@ public final class SqliteClipboardRepository implements ClipboardRepository {
                 .thumbnail(rs.getBytes("thumbnail"))
                 .timestamp(rs.getLong("timestamp"))
                 .pinned(rs.getInt("pinned") != 0)
+                .collectionId(collectionId(rs))
                 .build();
     }
 

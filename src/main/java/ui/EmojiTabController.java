@@ -6,6 +6,7 @@ import emoji.EmojiCategory;
 import emoji.EmojiService;
 import emoji.RecentEmojiService;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,12 +14,14 @@ import java.util.Objects;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.css.PseudoClass;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.skin.VirtualFlow;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -42,7 +45,7 @@ public final class EmojiTabController {
 
     private static final int COLUMNS = 9;
     private static final int MAX_SEARCH_RESULTS = 250;
-    private static final int CELL_SIZE = 40;
+    private static final int CELL_SIZE = 42;
     private static final int CELL_GAP = 2;
     private static final PseudoClass ACTIVE = PseudoClass.getPseudoClass("active");
 
@@ -56,6 +59,11 @@ public final class EmojiTabController {
     private final TextField searchField = new TextField();
     private final ListView<Object> listView = new ListView<>();
     private final Label hintLabel = new Label();
+    private final Label hintGlyph = new Label();
+    private final HBox categoryBar = new HBox(2);
+    private final Map<EmojiCategory, Label> categoryButtons = new EnumMap<>(EmojiCategory.class);
+    /** Item index of each category's header in the unfiltered list. */
+    private final Map<EmojiCategory, Integer> sectionStarts = new EnumMap<>(EmojiCategory.class);
     private final EmojiService emojiService;
     private final RecentEmojiService recentService;
     private final ApplicationSettings settings;
@@ -102,20 +110,36 @@ public final class EmojiTabController {
     }
 
     private void buildUi() {
-        searchField.getStyleClass().add("search-field");
-        searchField.setPromptText("Search emoji...");
-        HBox searchBox = new HBox(searchField);
-        searchBox.getStyleClass().add("search-box");
+        searchField.setPromptText("Search emoji");
+        HBox searchBox = Controls.searchBox(searchField);
+
+        categoryBar.getStyleClass().add("category-bar");
+        categoryBar.setAlignment(Pos.CENTER);
+        for (EmojiCategory category : EmojiCategory.values()) {
+            Label button = new Label(category.icon());
+            button.getStyleClass().add("category-button");
+            button.setTooltip(new Tooltip(category.label()));
+            button.setOnMouseClicked(e -> jumpTo(category));
+            button.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(button, Priority.ALWAYS);
+            categoryButtons.put(category, button);
+            categoryBar.getChildren().add(button);
+        }
+        // Highlight the section being scrolled through once the list's flow exists.
+        listView.skinProperty().addListener((obs, old, skin) -> {
+            if (listView.lookup(".virtual-flow") instanceof VirtualFlow<?> flow) {
+                flow.positionProperty().addListener((o, was, now) -> syncActiveCategory(flow));
+            }
+        });
 
         listView.getStyleClass().add("emoji-list");
         listView.setItems(items);
         listView.setCellFactory(lv -> new EmojiCell());
         listView.setFocusTraversable(true);
-        hintLabel.getStyleClass().add("hint");
-        hintLabel.setMaxWidth(Double.MAX_VALUE);
-        hintLabel.setAlignment(Pos.CENTER);
-        hintLabel.setMinHeight(22);
-        hintLabel.setPadding(new Insets(0, 12, 4, 12));
+        hintLabel.getStyleClass().add("emoji-name");
+        hintLabel.setMinWidth(0);
+        hintGlyph.getStyleClass().add("emoji-glyph-preview");
+        hintGlyph.setTextOverrun(OverrunStyle.CLIP);
 
         searchField.textProperty().addListener((obs, old, q) -> {
             if (q == null) {
@@ -181,8 +205,18 @@ public final class EmojiTabController {
         });
         listView.setOnMousePressed(e -> listView.requestFocus());
 
+        HBox preview = new HBox(8, hintGlyph, hintLabel);
+        preview.setAlignment(Pos.CENTER_LEFT);
+        preview.setMinWidth(0);
+        HBox.setHgrow(preview, Priority.ALWAYS);
+        HBox footer = new HBox(14, preview,
+                Controls.keyHint("\u21a9", "Insert"),
+                Controls.keyHint("esc", "Close"));
+        footer.getStyleClass().add("popup-footer");
+        showHint(null);
+
         VBox.setVgrow(listView, Priority.ALWAYS);
-        root.getChildren().addAll(searchBox, listView, hintLabel);
+        root.getChildren().addAll(searchBox, categoryBar, listView, footer);
     }
 
     private List<Emoji> recentEmojis() {
@@ -213,13 +247,15 @@ public final class EmojiTabController {
         lastFilter = searchField.getText().strip();
         lastRecentsKey = null;
         focusRow = -1;
-        hintLabel.setText(null);
+        showHint(null);
         rowIndices.clear();
+        sectionStarts.clear();
         List<Object> newItems = new ArrayList<>();
         if (lastFilter.isEmpty()) {
             List<Emoji> recents = recentEmojis();
             lastRecentsKey = String.join("", recents.stream().map(Emoji::character).toList());
             if (!recents.isEmpty()) {
+                sectionStarts.put(EmojiCategory.RECENTLY_USED, newItems.size());
                 addSection(newItems, EmojiCategory.RECENTLY_USED.label(), recents);
             }
             for (EmojiCategory category : EmojiCategory.values()) {
@@ -228,7 +264,8 @@ public final class EmojiTabController {
                 }
                 List<Emoji> emojis = emojiService.byCategory(category);
                 if (!emojis.isEmpty()) {
-                    addSection(newItems, category.icon() + "  " + category.label(), emojis);
+                    sectionStarts.put(category, newItems.size());
+                    addSection(newItems, category.label(), emojis);
                 }
             }
         } else {
@@ -240,6 +277,42 @@ public final class EmojiTabController {
             }
         }
         items.setAll(newItems);
+        boolean browsing = lastFilter.isEmpty();
+        categoryBar.setVisible(browsing);
+        categoryBar.setManaged(browsing);
+        categoryButtons.forEach((category, button) -> {
+            boolean present = sectionStarts.containsKey(category);
+            button.setVisible(present);
+            button.setManaged(present);
+        });
+        setActiveCategory(sectionStarts.keySet().stream().findFirst().orElse(null));
+    }
+
+    private void jumpTo(EmojiCategory category) {
+        Integer start = sectionStarts.get(category);
+        if (start != null) {
+            listView.scrollTo(start);
+            setActiveCategory(category);
+        }
+    }
+
+    private void syncActiveCategory(VirtualFlow<?> flow) {
+        var first = flow.getFirstVisibleCell();
+        if (first == null || sectionStarts.isEmpty()) {
+            return;
+        }
+        int index = first.getIndex();
+        EmojiCategory current = null;
+        for (var entry : sectionStarts.entrySet()) {
+            if (entry.getValue() <= index) {
+                current = entry.getKey();
+            }
+        }
+        setActiveCategory(current);
+    }
+
+    private void setActiveCategory(EmojiCategory active) {
+        categoryButtons.forEach((category, button) -> button.pseudoClassStateChanged(ACTIVE, category == active));
     }
 
     private void addSection(List<Object> out, String title, List<Emoji> emojis) {
@@ -324,8 +397,20 @@ public final class EmojiTabController {
     }
 
     private void showFocusedName() {
-        Emoji emoji = focusedEmoji();
-        hintLabel.setText(emoji == null ? null : emoji.name());
+        showHint(focusedEmoji());
+    }
+
+    /** Footer preview of the hovered / keyboard-focused emoji. */
+    private void showHint(Emoji emoji) {
+        hintGlyph.setText(emoji == null ? null : emoji.character());
+        hintGlyph.setVisible(emoji != null);
+        hintGlyph.setManaged(emoji != null);
+        hintLabel.setText(emoji == null ? "Pick an emoji" : capitalize(emoji.name()));
+        hintLabel.pseudoClassStateChanged(ACTIVE, emoji != null);
+    }
+
+    private static String capitalize(String name) {
+        return name == null || name.isEmpty() ? "" : Character.toUpperCase(name.charAt(0)) + name.substring(1);
     }
 
     private void refreshActiveVisuals() {
@@ -361,7 +446,7 @@ public final class EmojiTabController {
 
         EmojiCell() {
             rowBox.getStyleClass().add("emoji-row");
-            rowBox.setAlignment(Pos.CENTER);
+            rowBox.setAlignment(Pos.CENTER_LEFT);
             for (int i = 0; i < COLUMNS; i++) {
                 Label label = new Label();
                 label.getStyleClass().add("emoji-cell");
@@ -369,6 +454,9 @@ public final class EmojiTabController {
                 label.setPrefSize(CELL_SIZE, CELL_SIZE);
                 label.setMaxSize(CELL_SIZE, CELL_SIZE);
                 label.setAlignment(Pos.CENTER);
+                // ZWJ sequences can measure wider than the cell; never show "…" instead.
+                label.setTextOverrun(OverrunStyle.CLIP);
+                label.setEllipsisString("");
                 labels.add(label);
                 rowBox.getChildren().add(label);
             }
@@ -404,7 +492,7 @@ public final class EmojiTabController {
                     label.setText(emoji.character());
                     label.setUserData(new int[] {itemIndex, i});
                     label.setOnMouseClicked(e -> popup.select(emoji));
-                    label.setOnMouseEntered(e -> hintLabel.setText(emoji.name()));
+                    label.setOnMouseEntered(e -> showHint(emoji));
                     label.pseudoClassStateChanged(ACTIVE, rowFocused && i == focusCol);
                     label.setVisible(true);
                     label.setManaged(true);

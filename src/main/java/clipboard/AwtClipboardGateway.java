@@ -12,12 +12,12 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Optional;
 import javax.imageio.ImageIO;
 import model.ClipboardContentType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import platform.MacNative;
 
 /**
  * AWT-backed {@link ClipboardGateway} for macOS. Reads plain + rich text and images;
@@ -30,7 +30,10 @@ public final class AwtClipboardGateway implements ClipboardGateway, ClipboardOwn
 
     private static final Logger LOG = LoggerFactory.getLogger(AwtClipboardGateway.class);
 
-    private static final DataFlavor HTML_FLAVOR = createHtmlFlavor();
+    @Override
+    public long changeCount() {
+        return MacNative.clipboardChangeCount();
+    }
 
     @Override
     public Optional<ClipboardSnapshot> read() {
@@ -107,49 +110,34 @@ public final class AwtClipboardGateway implements ClipboardGateway, ClipboardOwn
         return null;
     }
 
-    private static String readHtml(Transferable t) {
+    static String readHtml(Transferable t) {
+        // Prefer the selected fragment, but also accept native HTML readers/streams
+        // and honor their declared charset through DataFlavor's text decoder.
+        if (t.isDataFlavorSupported(HtmlSelection.HTML_FLAVOR)) {
+            return readHtmlFlavor(t, HtmlSelection.HTML_FLAVOR);
+        }
+        for (DataFlavor flavor : t.getTransferDataFlavors()) {
+            if (flavor.isMimeTypeEqual("text/html") && flavor.isFlavorTextType()) {
+                String html = readHtmlFlavor(t, flavor);
+                if (html != null) {
+                    return html;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String readHtmlFlavor(Transferable t, DataFlavor flavor) {
         try {
-            if (HTML_FLAVOR != null && t.isDataFlavorSupported(HTML_FLAVOR)) {
-                Object value = t.getTransferData(HTML_FLAVOR);
-                return htmlToString(value);
+            try (var reader = flavor.getReaderForText(t)) {
+                var result = new java.io.StringWriter();
+                reader.transferTo(result);
+                return result.toString();
             }
         } catch (UnsupportedFlavorException | IOException e) {
             LOG.trace("html read failed", e);
         }
         return null;
-    }
-
-    private static String htmlToString(Object value) throws IOException {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof String s) {
-            return s;
-        }
-        if (value instanceof byte[] bytes) {
-            return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-        }
-        if (value instanceof InputStream in) {
-            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-        }
-        if (value instanceof java.io.Reader reader) {
-            StringBuilder sb = new StringBuilder();
-            char[] buf = new char[4096];
-            int n;
-            while ((n = reader.read(buf)) != -1) {
-                sb.append(buf, 0, n);
-            }
-            return sb.toString();
-        }
-        return null;
-    }
-
-    private static DataFlavor createHtmlFlavor() {
-        try {
-            return new DataFlavor("text/html;class=java.lang.String");
-        } catch (ClassNotFoundException e) {
-            return null;
-        }
     }
 
     private static byte[] encodePng(BufferedImage image) throws IOException {

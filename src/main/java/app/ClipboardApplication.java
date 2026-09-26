@@ -18,6 +18,7 @@ import hotkey.MacGlobalHotkeyService;
 import hotkey.ShortcutModifier;
 import java.nio.file.Path;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.logging.Logger;
 import javafx.application.Application;
@@ -59,6 +60,11 @@ public final class ClipboardApplication extends Application {
     private ClipboardPopupController popup;
     private SettingsController settingsController;
     private PasteService pasteService;
+    private final ExecutorService historyExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "history-thread");
+        t.setDaemon(true);
+        return t;
+    });
     private final ScheduledExecutorService pasteExecutor =
             Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "paste-thread");
@@ -99,10 +105,10 @@ public final class ClipboardApplication extends Application {
         pasteService = new MacPasteService();
 
         popup = new ClipboardPopupController(clipboardService, emojiService, recentEmojiService,
-                settings, pasteService, this::handleClipboardSelection, this::handleEmojiSelection);
+                settings, pasteService, this::handleClipboardSelection, this::handleEmojiSelection, historyExecutor);
 
         hotkeys = new MacGlobalHotkeyService();
-        settingsController = new SettingsController(settings, clipboardService, hotkeys, pasteService);
+        settingsController = new SettingsController(settings, clipboardService, hotkeys, pasteService, historyExecutor);
         Runnable togglePopup = () -> Platform.runLater(
                 () -> popup.toggle(ClipboardPopupController.Tab.CLIPBOARD));
         settingsController.setHotkeyCallback(togglePopup);
@@ -122,15 +128,11 @@ public final class ClipboardApplication extends Application {
                 this::openClipboardPopup,
                 this::openEmojiPopup,
                 () -> toggleMonitoring(),
-                () -> clipboardService.clearUnpinned(),
+                () -> historyExecutor.execute(clipboardService::clearUnpinned),
                 settingsController::show,
                 this::quit);
         tray.install();
         tray.setPaused(!settings.monitoringEnabled());
-
-        if (db != null) {
-            clipboardService.applyRetention();
-        }
 
         runDevSelfTestIfRequested();
     }
@@ -178,23 +180,27 @@ public final class ClipboardApplication extends Application {
     }
 
     /** Clipboard item chosen from history: restore to clipboard and optionally paste. */
-    private void handleClipboardSelection(ClipboardItem item) {
-        clipboardService.copyToClipboard(item, gateway);
-        schedulePasteIfEnabled();
+    private void handleClipboardSelection(long id) {
+        pasteExecutor.execute(() -> clipboardService.findById(id).ifPresent(item -> {
+            clipboardService.copyToClipboard(item, gateway);
+            pasteIfEnabled();
+        }));
     }
 
     /** Emoji chosen: copy it, remember it, and optionally paste it. */
     private void handleEmojiSelection(Emoji emoji) {
-        gateway.write(ClipboardSnapshot.text(emoji.character(), null));
-        recentEmojiService.record(emoji.character());
-        schedulePasteIfEnabled();
+        pasteExecutor.execute(() -> {
+            gateway.write(ClipboardSnapshot.text(emoji.character(), null));
+            recentEmojiService.record(emoji.character());
+            pasteIfEnabled();
+        });
     }
 
-    private void schedulePasteIfEnabled() {
+    private void pasteIfEnabled() {
         if (!settings.autoPaste()) {
             return;
         }
-        pasteExecutor.execute(() -> pasteService.restoreFocusAndPaste(true));
+        pasteService.restoreFocusAndPaste(true);
     }
 
     private void quit() {
@@ -248,6 +254,7 @@ public final class ClipboardApplication extends Application {
             tray.dispose();
         }
         pasteExecutor.shutdownNow();
+        historyExecutor.shutdownNow();
         if (database != null) {
             database.close();
         }

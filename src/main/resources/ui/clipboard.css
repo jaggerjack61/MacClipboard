@@ -1,4 +1,7 @@
-/* macOS-style popup theme for the clipboard history window. */
+/*
+ * Clipboard History theme (light). Colors are tokens on .root; clipboard-dark.css
+ * overrides only the tokens, so every rule below works in both appearances.
+ */
 
 .root {
     -fx-font-family: "SF Pro Text", ".AppleSystemUIFont", "Helvetica Neue", sans-serif;
@@ -6,44 +9,76 @@
     /* JavaFX's built-in modena stylesheet paints the scene root opaque white,
        which shows as a white square around the rounded panel on a TRANSPARENT stage. */
     -fx-background-color: transparent;
-    -panel-bg: rgba(246, 246, 246, 0.98);
-    -panel-fg: #1d1d1f;
-    -muted: #86868b;
-    -accent: #0a84ff;
-    -row-hover: rgba(0, 0, 0, 0.05);
-    -row-selected: rgba(10, 132, 255, 0.16);
-    -divider: rgba(0, 0, 0, 0.08);
+
+    -bg: #f7f7f8;
+    -window-bg: #efeff2;
+    -surface: #ffffff;
+    -fg: #1d1d1f;
+    -fg-secondary: #6e6e73;
+    -fg-tertiary: #a1a1a6;
+    -accent: #007aff;
+    -accent-soft: rgba(0, 122, 255, 0.13);
+    -focus-halo: rgba(0, 122, 255, 0.28);
+    -hover: rgba(0, 0, 0, 0.045);
+    -pressed: rgba(0, 0, 0, 0.08);
+    -fill: rgba(0, 0, 0, 0.055);
+    -separator: rgba(0, 0, 0, 0.08);
+    -window-border: rgba(0, 0, 0, 0.14);
+    -thumb: #ffffff;
+    -scroll-thumb: rgba(0, 0, 0, 0.22);
+    -button-bg: #ffffff;
+    -button-hover: #f4f4f6;
+    -button-border: rgba(0, 0, 0, 0.14);
+    -switch-off: rgba(0, 0, 0, 0.13);
+    -danger: #ff3b30;
+    -success: #34c759;
+
+    /* Modena controls (spinner, choice box, focus rings) follow the same accent. */
+    -fx-accent: -accent;
+    -fx-focus-color: -accent;
+    -fx-faint-focus-color: -focus-halo;
+    -fx-selection-bar: -accent;
+    -fx-selection-bar-non-focused: -accent-soft;
 }
+
+/* ---------------------------------------------------------------- popup shell */
 
 .popup-root {
-    -fx-background-color: -panel-bg;
-    -fx-background-radius: 14;
+    -fx-background-color: -bg;
+    -fx-background-radius: 12;
+    -fx-border-color: -window-border;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
 }
 
-/* Top bar: drag handle + traffic-light close/minimize (stage has no native chrome). */
+/* Drag handle with traffic lights and the tab switcher (stage has no native chrome). */
 .popup-topbar {
-    -fx-padding: 9 12 5 12;
+    -fx-padding: 10 12 8 14;
     -fx-alignment: center-left;
-    -fx-background-radius: 14 14 0 0;
     -fx-cursor: move;
 }
 
-.topbar-title {
-    -fx-text-fill: -muted;
-    -fx-font-size: 11px;
+.traffic-light {
+    -fx-background-radius: 6.5;
+    -fx-border-color: rgba(0, 0, 0, 0.12);
+    -fx-border-radius: 6.5;
+    -fx-border-width: 0.5;
+    -fx-min-width: 13;
+    -fx-min-height: 13;
+    -fx-pref-width: 13;
+    -fx-pref-height: 13;
+    -fx-max-width: 13;
+    -fx-max-height: 13;
+    -fx-alignment: center;
+    -fx-font-size: 7.5px;
     -fx-font-weight: bold;
+    /* Glyphs appear only while the pointer is over the bar, as on macOS. */
+    -fx-text-fill: transparent;
+    -fx-cursor: default;
 }
 
-.traffic-light {
-    -fx-background-radius: 9;
-    -fx-min-width: 17;
-    -fx-min-height: 17;
-    -fx-pref-width: 17;
-    -fx-pref-height: 17;
-    -fx-alignment: center;
-    -fx-font-size: 12px;
-    -fx-text-fill: rgba(0, 0, 0, 0.55);
-    -fx-cursor: hand;
+.popup-topbar:hover .traffic-light {
+    -fx-text-fill: rgba(0, 0, 0, 0.6);
 }
 
 .close-light {
@@ -54,215 +89,727 @@
     -fx-background-color: #febc2e;
 }
 
-.traffic-light:hover {
-    -fx-opacity: 0.8;
+.segmented {
+    -fx-background-color: -fill;
+    -fx-background-radius: 8;
+    -fx-padding: 2;
+    -fx-spacing: 2;
 }
 
-/* Header / tabs */
-.popup-header {
-    -fx-padding: 12 16 8 16;
-    -fx-spacing: 18;
-    -fx-alignment: center-left;
-    -fx-border-color: transparent transparent -divider transparent;
-    -fx-border-width: 0 0 1 0;
-}
-
-.tab-button {
-    -fx-font-size: 15px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -muted;
-    -fx-background-color: transparent;
-    -fx-padding: 2 4 4 4;
+.segment {
+    -fx-min-width: 92;
+    -fx-alignment: center;
+    -fx-padding: 3 14 3 14;
+    -fx-background-radius: 6;
+    -fx-text-fill: -fg-secondary;
+    -fx-font-size: 12.5px;
+    -fx-font-weight: 600;
     -fx-cursor: hand;
-    -fx-border-color: transparent transparent transparent transparent;
-    -fx-border-width: 0 0 2 0;
 }
 
-.tab-button:selected {
-    -fx-text-fill: -panel-fg;
-    -fx-border-color: transparent transparent -accent transparent;
+.segment:hover {
+    -fx-text-fill: -fg;
+}
+
+.segment:selected {
+    -fx-background-color: -thumb;
+    -fx-text-fill: -fg;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.14), 3, 0, 0, 1);
+}
+
+.segment:focused {
+    -fx-border-color: -accent;
+    -fx-border-radius: 6;
+}
+
+.popup-footer {
+    -fx-padding: 7 14 8 14;
+    -fx-alignment: center-left;
+    -fx-border-color: -separator transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+    -fx-min-height: 34;
+}
+
+.keycap {
+    -fx-background-color: -fill;
+    -fx-background-radius: 4;
+    -fx-padding: 0 5 0 5;
+    -fx-min-width: 18;
+    -fx-alignment: center;
+    -fx-text-fill: -fg-secondary;
+    -fx-font-size: 10.5px;
+}
+
+.key-action {
+    -fx-text-fill: -fg-tertiary;
+    -fx-font-size: 11px;
+}
+
+/* ---------------------------------------------------------------- icons */
+
+.icon-path {
+    -fx-fill: transparent;
+    -fx-stroke: -fg-secondary;
+    -fx-stroke-width: 1.7;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+
+/* ---------------------------------------------------------------- search */
+
+.search-box {
+    -fx-padding: 2 12 8 12;
 }
 
 .search-field {
-    -fx-background-color: rgba(0, 0, 0, 0.05);
+    -fx-background-color: -fill;
+    -fx-background-insets: 0;
     -fx-background-radius: 8;
-    -fx-text-fill: -panel-fg;
-    -fx-prompt-text-fill: -muted;
-    -fx-padding: 8 10 8 10;
+    -fx-border-color: transparent;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-text-fill: -fg;
+    -fx-prompt-text-fill: -fg-tertiary;
+    -fx-highlight-fill: -accent-soft;
+    -fx-highlight-text-fill: -fg;
+    -fx-padding: 6 32 6 32;
     -fx-font-size: 13px;
 }
 
 .search-field:focused {
-    -fx-background-color: rgba(0, 0, 0, 0.03);
+    -fx-background-color: -focus-halo, -surface;
+    -fx-background-insets: -3, 0;
+    -fx-background-radius: 11, 8;
     -fx-border-color: -accent;
-    -fx-border-radius: 8;
-    -fx-border-width: 1;
+    -fx-prompt-text-fill: -fg-tertiary;
 }
 
-.search-box {
-    -fx-padding: 8 14 8 14;
+.search-icon .icon-path {
+    -fx-stroke: -fg-tertiary;
+    -fx-stroke-width: 2;
 }
 
-/* Clipboard list */
-.clipboard-list {
+.search-clear {
+    -fx-background-color: -fg-tertiary;
+    -fx-cursor: hand;
+}
+
+.search-clear:hover {
+    -fx-background-color: -fg-secondary;
+}
+
+/* ---------------------------------------------------------------- collections */
+
+.collection-bar,
+.collection-bar > .viewport {
     -fx-background-color: transparent;
-    -fx-padding: 4 8 8 8;
-}
-
-.clipboard-list .list-cell {
-    -fx-background-color: transparent;
+    -fx-background-insets: 0;
     -fx-padding: 0;
 }
 
-.clipboard-list .list-cell:filled:selected {
-    -fx-background-color: transparent;
+.collection-chips {
+    -fx-padding: 0 12 8 12;
 }
 
-.clipboard-item {
-    -fx-background-color: transparent;
-    -fx-background-radius: 9;
-    -fx-padding: 9 10 9 10;
-    -fx-spacing: 2;
+.chip {
+    -fx-background-color: -fill;
+    -fx-background-radius: 999;
+    -fx-padding: 3 10 3 10;
+    -fx-min-height: 24;
+    -fx-max-width: 170;
+    -fx-graphic-text-gap: 6;
+    -fx-text-fill: -fg-secondary;
+    -fx-font-size: 12px;
     -fx-cursor: hand;
 }
 
-.clipboard-item:selected {
-    -fx-background-color: -row-selected;
+.chip:hover {
+    -fx-background-color: -pressed;
+    -fx-text-fill: -fg;
 }
 
-.clipboard-item:empty {
-    -fx-opacity: 0;
+.chip:selected {
+    -fx-background-color: -accent;
+    -fx-text-fill: white;
 }
 
-.item-preview {
-    -fx-text-fill: -panel-fg;
-    -fx-font-size: 13.5px;
-}
-
-.item-preview:selected {
-    -fx-text-fill: -panel-fg;
-}
-
-.item-meta {
-    -fx-text-fill: -muted;
-    -fx-font-size: 11.5px;
-}
-
-.item-actions {
-    -fx-spacing: 2;
-    -fx-alignment: center;
-}
-
-.icon-button {
-    -fx-background-color: transparent;
-    -fx-text-fill: -muted;
-    -fx-font-size: 14px;
-    -fx-background-radius: 6;
-    -fx-padding: 3 6 3 6;
-    -fx-cursor: hand;
-}
-
-.icon-button:hover {
-    -fx-background-color: -row-hover;
-    -fx-text-fill: -panel-fg;
-}
-
-/* Pin state must be obvious at a glance; -fx-text-fill does not apply to color
-   emoji glyphs on macOS, so opacity is used instead. */
-.pin-button {
-    -fx-opacity: 0.35;
-}
-
-.pin-button:on,
-.pinned .pin-button {
-    -fx-opacity: 1.0;
-}
-
-.pin-button:hover {
-    -fx-opacity: 1.0;
-}
-
-.thumb {
-    -fx-background-radius: 5;
-    -fx-border-color: rgba(0, 0, 0, 0.12);
-    -fx-border-radius: 5;
-}
-
-/* Emoji tab (virtualized ListView of section headers + emoji rows) */
-.emoji-list {
-    -fx-background-color: transparent;
-    -fx-padding: 4 0 0 0;
-}
-
-.emoji-list .list-cell {
-    -fx-background-color: transparent;
-    -fx-padding: 0;
-}
-
-.emoji-list .list-cell:filled:selected {
-    -fx-background-color: transparent;
-}
-
-.emoji-header-cell {
-    -fx-text-fill: -muted;
-    -fx-font-size: 11.5px;
-    -fx-font-weight: bold;
-    -fx-padding: 6 14 2 14;
-}
-
-.emoji-row {
-    -fx-spacing: 2;
-    -fx-alignment: center;
-    -fx-padding: 1 0 1 0;
-}
-
-.emoji-cell {
-    -fx-background-color: transparent;
-    -fx-background-radius: 8;
-    -fx-font-size: 24px;
-    -fx-min-width: 40;
-    -fx-min-height: 40;
-    -fx-alignment: center;
-    -fx-cursor: hand;
-}
-
-.emoji-cell:hover,
-.emoji-cell:active {
-    -fx-background-color: -row-hover;
-}
-
-/* General text */
-.hint {
-    -fx-text-fill: -muted;
+.chip-count {
+    -fx-text-fill: -fg-tertiary;
     -fx-font-size: 11px;
 }
 
-/* Settings window */
+.chip:selected .chip-count {
+    -fx-text-fill: rgba(255, 255, 255, 0.75);
+}
+
+.chip-add {
+    -fx-padding: 3 7 3 7;
+    -fx-background-color: transparent;
+    -fx-border-color: -separator;
+    -fx-border-radius: 999;
+}
+
+.chip-add:hover {
+    -fx-background-color: -hover;
+}
+
+.chip-editor {
+    -fx-background-color: -focus-halo, -surface;
+    -fx-background-insets: -2, 0;
+    -fx-background-radius: 999, 999;
+    -fx-border-color: -accent;
+    -fx-border-radius: 999;
+    -fx-text-fill: -fg;
+    -fx-prompt-text-fill: -fg-tertiary;
+    -fx-highlight-fill: -accent-soft;
+    -fx-highlight-text-fill: -fg;
+    -fx-font-size: 12px;
+    -fx-padding: 2 10 2 10;
+    -fx-min-height: 24;
+}
+
+.chip-editor:invalid {
+    -fx-background-color: rgba(255, 59, 48, 0.25), -surface;
+    -fx-border-color: -danger;
+}
+
+/* ---------------------------------------------------------------- lists */
+
+.clipboard-list,
+.clipboard-list:focused,
+.emoji-list,
+.emoji-list:focused {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.emoji-list .list-cell,
+.emoji-list .list-cell:filled:selected {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.clipboard-list .list-cell,
+.clipboard-list .list-cell:filled:selected {
+    -fx-background-color: transparent;
+    -fx-padding: 1 6 1 8;
+}
+
+.clipboard-item {
+    -fx-background-radius: 8;
+    -fx-padding: 7 6 7 8;
+    -fx-cursor: hand;
+}
+
+.clipboard-item:hover {
+    -fx-background-color: -hover;
+}
+
+.clipboard-item:selected {
+    -fx-background-color: -accent-soft;
+}
+
+.type-badge {
+    -fx-background-color: -fill;
+    -fx-background-radius: 8;
+}
+
+.item-preview {
+    -fx-text-fill: -fg;
+    -fx-font-size: 13px;
+}
+
+.item-meta {
+    -fx-text-fill: -fg-secondary;
+    -fx-font-size: 11px;
+}
+
+/* Row actions stay out of the way until the row is hovered or selected. */
+.icon-button,
+.icon-button:hover,
+.icon-button:focused,
+.icon-button:armed {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 6;
+    -fx-border-color: transparent;
+    -fx-effect: null;
+    -fx-padding: 4;
+    -fx-cursor: hand;
+}
+
+.icon-button {
+    -fx-opacity: 0;
+}
+
+.clipboard-item:hover .icon-button,
+.clipboard-item:selected .icon-button,
+.clipboard-item:pinned .pin-button {
+    -fx-opacity: 1;
+}
+
+.icon-button:hover {
+    -fx-background-color: -pressed;
+}
+
+.icon-button:hover .icon-path {
+    -fx-stroke: -fg;
+}
+
+.clipboard-item:pinned .pin-button .icon-path {
+    -fx-stroke: -accent;
+    -fx-fill: -accent;
+}
+
+.delete-button:hover .icon-path {
+    -fx-stroke: -danger;
+}
+
+.type-badge .icon-path {
+    -fx-stroke-width: 1.8;
+}
+
+.empty-state {
+    -fx-padding: 0 48 48 48;
+}
+
+.empty-icon .icon-path {
+    -fx-stroke: -fg-tertiary;
+    -fx-stroke-width: 1.4;
+}
+
+.empty-title {
+    -fx-text-fill: -fg;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+    -fx-padding: 4 0 0 0;
+}
+
+.empty-detail {
+    -fx-text-fill: -fg-secondary;
+    -fx-font-size: 12px;
+    -fx-text-alignment: center;
+}
+
+/* ---------------------------------------------------------------- emoji */
+
+.category-bar {
+    -fx-padding: 0 10 6 10;
+    -fx-border-color: transparent transparent -separator transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.category-button {
+    -fx-font-family: "Apple Color Emoji";
+    -fx-font-size: 16px;
+    -fx-min-height: 28;
+    -fx-alignment: center;
+    -fx-background-radius: 6;
+    -fx-opacity: 0.6;
+    -fx-cursor: hand;
+}
+
+.category-button:hover {
+    -fx-opacity: 0.85;
+    -fx-background-color: -hover;
+}
+
+.category-button:active {
+    -fx-opacity: 1;
+    -fx-background-color: -fill;
+}
+
+.emoji-list .list-cell.emoji-header-cell {
+    -fx-text-fill: -fg-secondary;
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+    -fx-padding: 10 20 4 20;
+}
+
+.emoji-row {
+    -fx-padding: 1 0 1 16;
+}
+
+/* An explicit emoji font keeps characters such as ❤️ and ☺️ in color: without it JavaFX
+   can fall back to the text font's monochrome glyph. */
+.emoji-cell {
+    -fx-font-family: "Apple Color Emoji";
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-font-size: 26px;
+    -fx-cursor: hand;
+}
+
+.emoji-cell:hover {
+    -fx-background-color: -hover;
+}
+
+.emoji-cell:active {
+    -fx-background-color: -accent-soft;
+    -fx-border-color: -accent;
+    -fx-border-width: 1.5;
+    -fx-border-radius: 8;
+}
+
+.emoji-glyph-preview {
+    -fx-font-family: "Apple Color Emoji";
+    -fx-font-size: 17px;
+}
+
+.emoji-name {
+    -fx-text-fill: -fg-tertiary;
+    -fx-font-size: 12px;
+}
+
+.emoji-name:active {
+    -fx-text-fill: -fg;
+}
+
+/* ---------------------------------------------------------------- scrollbars */
+
+.scroll-bar:vertical,
+.scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.scroll-bar:vertical {
+    -fx-pref-width: 10;
+    -fx-padding: 3 2 3 0;
+}
+
+.scroll-bar:horizontal {
+    -fx-pref-height: 10;
+    -fx-padding: 0 3 2 3;
+}
+
+.scroll-bar > .track,
+.scroll-bar > .track-background {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.scroll-bar > .thumb {
+    -fx-background-color: -scroll-thumb;
+    -fx-background-insets: 0;
+    -fx-background-radius: 4;
+}
+
+.scroll-bar > .increment-button,
+.scroll-bar > .decrement-button,
+.scroll-bar > .increment-button > .increment-arrow,
+.scroll-bar > .decrement-button > .decrement-arrow {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.list-view > .corner,
+.scroll-pane > .corner {
+    -fx-background-color: transparent;
+}
+
+/* ---------------------------------------------------------------- popups */
+
+.tooltip {
+    -fx-background-color: -surface;
+    -fx-background-radius: 6;
+    -fx-text-fill: -fg;
+    -fx-font-size: 11.5px;
+    -fx-padding: 4 8 4 8;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.22), 8, 0, 0, 2);
+}
+
+.context-menu {
+    -fx-background-color: -surface;
+    -fx-background-radius: 8;
+    -fx-border-color: -window-border;
+    -fx-border-radius: 8;
+    -fx-padding: 4;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 12, 0, 0, 4);
+}
+
+.context-menu .menu-item {
+    -fx-background-radius: 5;
+    -fx-padding: 4 12 4 12;
+}
+
+.context-menu .menu-item .label {
+    -fx-text-fill: -fg;
+}
+
+.context-menu .menu-item:focused {
+    -fx-background-color: -accent;
+}
+
+.context-menu .menu-item:focused .label {
+    -fx-text-fill: white;
+}
+
+.context-menu .menu-item:disabled .label {
+    -fx-text-fill: -fg-tertiary;
+}
+
+.context-menu .menu-item:disabled {
+    -fx-opacity: 1;
+}
+
+.context-menu .check-menu-item:checked .mark,
+.context-menu .menu .right-container > .arrow {
+    -fx-background-color: -fg-secondary;
+}
+
+.context-menu .check-menu-item:checked:focused .mark,
+.context-menu .menu:focused .right-container > .arrow {
+    -fx-background-color: white;
+}
+
+.context-menu .separator {
+    -fx-padding: 3 6 3 6;
+}
+
+.context-menu .separator .line {
+    -fx-border-color: -separator transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+    -fx-border-insets: 0;
+    -fx-padding: 0;
+}
+
+/* ---------------------------------------------------------------- settings */
+
+.settings-scroll,
+.settings-scroll > .viewport,
 .settings-root {
-    -fx-background-color: -panel-bg;
-    -fx-padding: 18;
-    -fx-spacing: 12;
+    -fx-background-color: -window-bg;
+    -fx-background-insets: 0;
+}
+
+.settings-scroll {
+    -fx-padding: 0;
+}
+
+.settings-root {
+    -fx-padding: 22 22 26 22;
+    -fx-spacing: 6;
+}
+
+.settings-header {
+    -fx-padding: 0 0 8 0;
 }
 
 .settings-title {
     -fx-font-size: 17px;
     -fx-font-weight: bold;
-    -fx-text-fill: -panel-fg;
+    -fx-text-fill: -fg;
 }
 
-.settings-row {
-    -fx-spacing: 10;
-    -fx-alignment: center-left;
-}
-
-.settings-label {
-    -fx-text-fill: -panel-fg;
-    -fx-min-width: 190;
+.settings-subtitle {
+    -fx-text-fill: -fg-secondary;
+    -fx-font-size: 12px;
 }
 
 .section-header {
-    -fx-text-fill: -panel-fg;
-    -fx-font-weight: bold;
+    -fx-text-fill: -fg-secondary;
+    -fx-font-size: 11.5px;
+    -fx-font-weight: 600;
+    -fx-padding: 12 0 2 12;
+}
+
+.settings-card {
+    -fx-background-color: -surface;
+    -fx-background-radius: 10;
+    -fx-border-color: -separator;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+}
+
+.card-divider {
+    -fx-min-height: 1;
+    -fx-pref-height: 1;
+    -fx-max-height: 1;
+    -fx-background-color: -separator;
+    -fx-background-insets: 0 0 0 14;
+}
+
+.settings-row {
+    -fx-padding: 9 14 9 14;
+    -fx-min-height: 44;
+}
+
+.settings-label {
+    -fx-text-fill: -fg;
     -fx-font-size: 13px;
-    -fx-padding: 8 0 0 0;
+}
+
+.settings-detail,
+.settings-footnote {
+    -fx-text-fill: -fg-secondary;
+    -fx-font-size: 11.5px;
+}
+
+.settings-footnote {
+    -fx-padding: 4 0 0 12;
+}
+
+.settings-about-name {
+    -fx-text-fill: -fg;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+}
+
+.settings-about {
+    -fx-padding: 12 14 12 14;
+}
+
+.status-dot {
+    -fx-min-width: 7;
+    -fx-min-height: 7;
+    -fx-max-width: 7;
+    -fx-max-height: 7;
+    -fx-background-radius: 3.5;
+    -fx-background-color: -danger;
+}
+
+.status-dot:granted {
+    -fx-background-color: -success;
+}
+
+.settings-root .button,
+.settings-root .choice-box {
+    -fx-background-color: -button-bg;
+    -fx-background-insets: 0;
+    -fx-background-radius: 6;
+    -fx-border-color: -button-border;
+    -fx-border-radius: 6;
+    -fx-text-fill: -fg;
+    -fx-font-size: 12.5px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 1, 0, 0, 1);
+}
+
+.settings-root .button {
+    -fx-padding: 4 12 4 12;
+}
+
+.settings-root .choice-box {
+    -fx-padding: 1 4 1 6;
+}
+
+.settings-root .button:hover,
+.settings-root .choice-box:hover {
+    -fx-background-color: -button-hover;
+}
+
+.settings-root .button:armed,
+.settings-root .choice-box:showing {
+    -fx-background-color: -pressed;
+}
+
+.settings-root .button:focused,
+.settings-root .choice-box:focused {
+    -fx-border-color: -accent;
+}
+
+.settings-root .button.destructive {
+    -fx-text-fill: -danger;
+}
+
+.settings-root .button:disabled {
+    -fx-opacity: 0.55;
+}
+
+.settings-root .choice-box > .label {
+    -fx-text-fill: -fg;
+}
+
+.settings-root .choice-box > .open-button > .arrow {
+    -fx-background-color: -fg-secondary;
+}
+
+.settings-root .spinner {
+    -fx-background-color: -button-border, -surface;
+    -fx-background-insets: 0, 1;
+    -fx-background-radius: 6, 5;
+}
+
+.settings-root .spinner > .text-field {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fg;
+    -fx-padding: 4 8 4 8;
+}
+
+.settings-root .spinner > .increment-arrow-button,
+.settings-root .spinner > .decrement-arrow-button {
+    -fx-background-color: transparent;
+    -fx-padding: 3 7 3 7;
+}
+
+.settings-root .spinner > .increment-arrow-button:hover,
+.settings-root .spinner > .decrement-arrow-button:hover {
+    -fx-background-color: -hover;
+}
+
+.settings-root .spinner > .increment-arrow-button > .increment-arrow,
+.settings-root .spinner > .decrement-arrow-button > .decrement-arrow {
+    -fx-background-color: -fg-secondary;
+}
+
+.settings-root .spinner:focused {
+    -fx-background-color: -focus-halo, -accent, -surface;
+    -fx-background-insets: -2, 0, 1;
+    -fx-background-radius: 8, 6, 5;
+}
+
+.hyperlink,
+.hyperlink:hover,
+.hyperlink:visited {
+    -fx-text-fill: -accent;
+    -fx-padding: 0;
+    -fx-border-color: transparent;
+}
+
+.hyperlink:hover {
+    -fx-underline: true;
+}
+
+/* macOS-style switch built from a CheckBox: the box is the track, the mark the knob.
+   Asymmetric padding slides the knob left (off) or right (on). */
+.switch {
+    -fx-padding: 0;
+    -fx-label-padding: 0;
+    -fx-graphic-text-gap: 0;
+}
+
+.switch > .box,
+.switch:hover > .box,
+.switch:armed > .box,
+.switch:focused > .box {
+    -fx-background-color: -switch-off;
+    -fx-background-insets: 0;
+    -fx-background-radius: 10;
+    -fx-border-color: transparent;
+    -fx-padding: 2 16 2 2;
+}
+
+.switch:selected > .box,
+.switch:selected:hover > .box,
+.switch:selected:armed > .box,
+.switch:selected:focused > .box {
+    -fx-background-color: -accent;
+    -fx-padding: 2 2 2 16;
+}
+
+.switch:focused > .box {
+    -fx-border-color: -focus-halo;
+    -fx-border-width: 2;
+    -fx-border-insets: -3;
+    -fx-border-radius: 13;
+}
+
+.switch > .box > .mark,
+.switch:selected > .box > .mark {
+    -fx-shape: "M8 0 A8 8 0 1 0 8 16 A8 8 0 1 0 8 0 Z";
+    -fx-background-color: white;
+    -fx-background-insets: 0;
+    -fx-padding: 8;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 2, 0, 0, 1);
 }

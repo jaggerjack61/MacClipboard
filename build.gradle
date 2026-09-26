@@ -61,6 +61,13 @@ run {
     standardInput = System.in
 }
 
+jar {
+    manifest {
+        // Read back by the About section in Settings.
+        attributes 'Implementation-Title': 'Clipboard History', 'Implementation-Version': project.version
+    }
+}
+
 test {
     useJUnitPlatform()
     testLogging {
@@ -68,6 +75,27 @@ test {
     }
     // Unit tests never touch the real macOS clipboard.
     systemProperty 'java.awt.headless', 'true'
+}
+
+// JavaFX controller integration checks need a graphical desktop; run explicitly.
+sourceSets {
+    uiTest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    uiTestImplementation.extendsFrom testImplementation, implementation
+    uiTestRuntimeOnly.extendsFrom testRuntimeOnly, runtimeOnly
+}
+tasks.register('uiTest', Test) {
+    description = 'Verify JavaFX settings and asynchronous history loading on a desktop.'
+    group = 'verification'
+    testClassesDirs = sourceSets.uiTest.output.classesDirs
+    classpath = sourceSets.uiTest.runtimeClasspath
+    useJUnitPlatform()
+    systemProperty 'apple.awt.UIElement', 'true'
+    testLogging { events 'passed', 'skipped', 'failed' }
 }
 
 // Package a runnable macOS .app (menu-bar / accessory app) using jpackage.
@@ -96,7 +124,9 @@ tasks.register('packageApp', Exec) {
                 '--type', 'app-image',
                 '--name', 'Clipboard',
                 '--app-version', project.version.toString(),
-                '--vendor', 'Clipboard',
+                '--vendor', 'Samuel Jarai',
+                '--copyright', 'Copyright © 2026 Samuel Jarai. MIT License.',
+                '--description', 'Clipboard history and emoji picker for macOS',
                 '--input', installLib.absolutePath,
                 '--main-jar', mainJar,
                 '--main-class', 'app.Launcher',

@@ -9,6 +9,18 @@ import org.junit.jupiter.api.Test;
 class ClipboardHasherTest {
 
     @Test
+    void formattingChangesProduceDifferentHashes() {
+        assertNotEquals(ClipboardHasher.hash(ClipboardSnapshot.text("hello", "<b>hello</b>")),
+                ClipboardHasher.hash(ClipboardSnapshot.text("hello", "<i>hello</i>")));
+    }
+
+    @Test
+    void textAndHtmlBoundariesCannotCollide() {
+        assertNotEquals(ClipboardHasher.hash(ClipboardSnapshot.text("a\u0000", "b")),
+                ClipboardHasher.hash(ClipboardSnapshot.text("a", "\u0000b")));
+    }
+
+    @Test
     void sameContentSameHash() {
         String a = ClipboardHasher.hash(ClipboardSnapshot.text("copy me", null));
         String b = ClipboardHasher.hash(ClipboardSnapshot.text("copy me", null));

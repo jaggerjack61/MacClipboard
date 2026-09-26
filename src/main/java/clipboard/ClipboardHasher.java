@@ -21,6 +21,9 @@ public final class ClipboardHasher {
             md.update((byte) 0);
             if (snapshot.contentType() == ClipboardContentType.IMAGE && snapshot.image() != null) {
                 md.update(snapshot.image());
+            } else if (snapshot.contentType() == ClipboardContentType.RICH_TEXT) {
+                updateText(md, snapshot.text());
+                updateText(md, snapshot.html());
             } else if (snapshot.text() != null) {
                 md.update(snapshot.text().getBytes(StandardCharsets.UTF_8));
             }
@@ -28,5 +31,12 @@ public final class ClipboardHasher {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
+    }
+
+    private static void updateText(MessageDigest md, String value) {
+        byte[] bytes = value == null ? new byte[0] : value.getBytes(StandardCharsets.UTF_8);
+        // Length prefixes prevent ambiguous boundaries between plain text and HTML.
+        md.update(java.nio.ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+        md.update(bytes);
     }
 }

@@ -17,7 +17,9 @@ public record ClipboardItem(
         byte[] image,
         byte[] thumbnail,
         long timestamp,
-        boolean pinned
+        boolean pinned,
+        /** The collection holding this (pinned) item, or null when it is in none. */
+        Long collectionId
 ) {
 
     public static Builder builder() {
@@ -30,6 +32,10 @@ public record ClipboardItem(
 
     public ClipboardItem withPinned(boolean newPinned) {
         return toBuilder().pinned(newPinned).build();
+    }
+
+    public ClipboardItem withCollection(Long newCollectionId) {
+        return toBuilder().collectionId(newCollectionId).build();
     }
 
     public ClipboardItem withTimestamp(long newTimestamp) {
@@ -51,7 +57,8 @@ public record ClipboardItem(
                 .image(image)
                 .thumbnail(thumbnail)
                 .timestamp(timestamp)
-                .pinned(pinned);
+                .pinned(pinned)
+                .collectionId(collectionId);
     }
 
     /** Content-free representation, safe for logging. Never includes clipboard data. */
@@ -60,7 +67,8 @@ public record ClipboardItem(
         int size = hasImage() ? image.length : (textContent == null ? 0 : textContent.length());
         String hashPrefix = hash == null ? "null" : hash.substring(0, Math.min(8, hash.length()));
         return "ClipboardItem{id=" + id + ", type=" + contentType + ", size=" + size
-                + ", timestamp=" + timestamp + ", pinned=" + pinned + ", hash=" + hashPrefix + '}';
+                + ", timestamp=" + timestamp + ", pinned=" + pinned + ", collection=" + collectionId
+                + ", hash=" + hashPrefix + '}';
     }
 
     public static final class Builder {
@@ -74,6 +82,7 @@ public record ClipboardItem(
         private byte[] thumbnail;
         private long timestamp = System.currentTimeMillis();
         private boolean pinned;
+        private Long collectionId;
 
         public Builder id(long id) {
             this.id = id;
@@ -125,9 +134,14 @@ public record ClipboardItem(
             return this;
         }
 
+        public Builder collectionId(Long collectionId) {
+            this.collectionId = collectionId;
+            return this;
+        }
+
         public ClipboardItem build() {
             return new ClipboardItem(id, contentType, hash, preview, textContent, htmlContent,
-                    image, thumbnail, timestamp, pinned);
+                    image, thumbnail, timestamp, pinned, collectionId);
         }
     }
 }

@@ -32,7 +32,7 @@ public final class ApplicationSettings {
 
     public ApplicationSettings(SettingsStore store) {
         this.store = store;
-        this.cache = new java.util.HashMap<>(store.loadAll());
+        this.cache = new java.util.concurrent.ConcurrentHashMap<>(store.loadAll());
     }
 
     public int maxHistory() {

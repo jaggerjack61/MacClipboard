@@ -1,0 +1,30 @@
+/* Dark appearance: overrides clipboard.css tokens only (added after it by ui.Theme). */
+
+.root {
+    -bg: #242426;
+    -window-bg: #1e1e20;
+    -surface: #2c2c2e;
+    -fg: #f5f5f7;
+    -fg-secondary: #a1a1a6;
+    -fg-tertiary: #6e6e73;
+    -accent: #0a84ff;
+    -accent-soft: rgba(10, 132, 255, 0.24);
+    -focus-halo: rgba(10, 132, 255, 0.35);
+    -hover: rgba(255, 255, 255, 0.06);
+    -pressed: rgba(255, 255, 255, 0.1);
+    -fill: rgba(255, 255, 255, 0.075);
+    -separator: rgba(255, 255, 255, 0.08);
+    -window-border: rgba(255, 255, 255, 0.14);
+    -thumb: #5a5a5e;
+    -scroll-thumb: rgba(255, 255, 255, 0.25);
+    -button-bg: #3a3a3c;
+    -button-hover: #444446;
+    -button-border: rgba(255, 255, 255, 0.1);
+    -switch-off: rgba(255, 255, 255, 0.16);
+    -danger: #ff453a;
+    -success: #30d158;
+
+    -fx-base: #3a3a3c;
+    -fx-background: #1e1e20;
+    -fx-control-inner-background: #2c2c2e;
+}
